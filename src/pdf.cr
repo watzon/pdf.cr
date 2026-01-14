@@ -41,6 +41,8 @@ require "./pdf/filters/flate"
 # Font handling
 require "./pdf/fonts/base"
 require "./pdf/fonts/type1"
+require "./pdf/fonts/truetype"
+require "./pdf/fonts/truetype_font"
 
 # Document writer
 require "./pdf/writer/document_writer"

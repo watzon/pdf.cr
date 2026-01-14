@@ -14,6 +14,7 @@ end
 require "./pdf/objects/*"
 require "./pdf/filters/*"
 require "./pdf/fonts/*"
+require "./pdf/fonts/truetype/*"
 require "./pdf/document_spec"
 require "./pdf/page_spec"
 require "./integration/*"

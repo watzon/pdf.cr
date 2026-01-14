@@ -9,6 +9,7 @@ A pure Crystal library for PDF generation and parsing.
 - **Pure Crystal** — No C dependencies, easy installation via shards
 - **PDF 1.7 compliant** — Generates modern, standards-compliant PDFs
 - **Type1 fonts** — Built-in support for all 14 standard PDF fonts
+- **TrueType fonts** — Load any .ttf font with automatic subsetting and full Unicode support
 - **Vector graphics** — Lines, rectangles, colors, and more
 - **Compression** — FlateDecode compression for smaller files
 - **Multi-page** — Create documents with any number of pages
@@ -84,14 +85,46 @@ pdf.page do |page|
 end
 ```
 
-### Available Fonts
+### Standard Fonts (Type1)
 
-All 14 standard Type1 fonts are available:
+All 14 standard PDF fonts are built-in:
 
 - Helvetica, Helvetica-Bold, Helvetica-Oblique, Helvetica-BoldOblique
 - Times-Roman, Times-Bold, Times-Italic, Times-BoldItalic  
 - Courier, Courier-Bold, Courier-Oblique, Courier-BoldOblique
 - Symbol, ZapfDingbats
+
+### TrueType Fonts
+
+Load any TrueType (.ttf) font for full Unicode support:
+
+```crystal
+pdf = PDF::Document.new
+
+# Load a TrueType font
+my_font = pdf.load_font("path/to/DejaVuSans.ttf")
+
+pdf.page do |page|
+  # Use the TrueType font
+  page.font my_font, size: 16
+  page.text "English: Hello, World!", at: {72, 720}
+  page.text "Russian: Привет, мир!", at: {72, 690}
+  page.text "Greek: Γειά σου, Κόσμε!", at: {72, 660}
+  page.text "Symbols: © ® ™ € £ ¥ → ←", at: {72, 630}
+  
+  # You can mix TrueType and Type1 fonts
+  page.font "Helvetica", size: 12
+  page.text "Back to Helvetica", at: {72, 590}
+end
+
+pdf.save("unicode_text.pdf")
+```
+
+**Features:**
+- Full Unicode support (BMP and supplementary planes)
+- Automatic font subsetting (only used glyphs are embedded)
+- Proper glyph metrics for accurate text positioning
+- ToUnicode mapping for text extraction from generated PDFs
 
 ### Graphics
 
@@ -156,13 +189,14 @@ See [ROADMAP.md](ROADMAP.md) for the full development plan.
 - [x] PDF object model (Boolean, Number, String, Name, Array, Dictionary, Stream)
 - [x] Document structure (Catalog, Pages, Page)
 - [x] Type1 font support with glyph metrics
+- [x] TrueType font embedding with subsetting and Unicode support
 - [x] Basic text rendering
 - [x] Vector graphics (lines, rectangles)
 - [x] FlateDecode compression
 - [x] Multi-page documents
 
 ### Coming Soon
-- [ ] TrueType/OpenType font embedding with subsetting
+- [ ] OpenType font support (CFF outlines)
 - [ ] Image embedding (JPEG, PNG)
 - [ ] PDF parsing and text extraction
 - [ ] Advanced text layout

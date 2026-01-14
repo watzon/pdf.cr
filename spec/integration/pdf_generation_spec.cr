@@ -148,4 +148,147 @@ describe "PDF Generation Integration" do
       end
     end
   end
+
+  describe "TrueType fonts" do
+    it "generates PDF with TrueType font" do
+      doc = PDF::Document.new
+      custom_font = doc.load_font("spec/fixtures/fonts/DejaVuSans.ttf")
+
+      doc.page do |page|
+        page.font custom_font, size: 24
+        page.text "Hello with TrueType!", at: {72, 720}
+
+        page.font custom_font, size: 12
+        page.text "Custom font embedding works!", at: {72, 680}
+      end
+
+      bytes = doc.to_slice
+
+      # Verify PDF structure
+      content = String.new(bytes)
+      content.should start_with("%PDF-1.7")
+      content.should contain("%%EOF")
+      content.should contain("/Type /Catalog")
+      content.should contain("/Type /Page")
+
+      # Should have TrueType font structures
+      content.should contain("/Type0")
+      content.should contain("/CIDFontType2")
+      content.should contain("/FontDescriptor")
+      content.should contain("/FontFile2")
+      content.should contain("/ToUnicode")
+    end
+
+    it "supports Unicode text with TrueType" do
+      doc = PDF::Document.new
+      custom_font = doc.load_font("spec/fixtures/fonts/DejaVuSans.ttf")
+
+      doc.page do |page|
+        page.font custom_font, size: 18
+        # Various Unicode characters
+        page.text "Hello World! (ASCII)", at: {72, 720}
+        page.text "Привет мир! (Cyrillic)", at: {72, 690}
+        page.text "日本語 (Japanese)", at: {72, 660}
+      end
+
+      bytes = doc.to_slice
+
+      # Should generate valid PDF
+      content = String.new(bytes)
+      content.should start_with("%PDF-1.7")
+      content.should contain("/Identity-H")
+    end
+
+    it "mixes Type1 and TrueType fonts" do
+      doc = PDF::Document.new
+      custom_font = doc.load_font("spec/fixtures/fonts/DejaVuSans.ttf")
+
+      doc.page do |page|
+        page.font "Helvetica", size: 18
+        page.text "Standard Helvetica", at: {72, 720}
+
+        page.font custom_font, size: 18
+        page.text "Custom TrueType", at: {72, 690}
+
+        page.font "Times-Roman", size: 18
+        page.text "Standard Times", at: {72, 660}
+      end
+
+      bytes = doc.to_slice
+      content = String.new(bytes)
+
+      # Should have both font types
+      content.should contain("/Helvetica")
+      content.should contain("/Times-Roman")
+      content.should contain("/CIDFontType2")
+    end
+
+    it "reuses same font across pages" do
+      doc = PDF::Document.new
+      custom_font = doc.load_font("spec/fixtures/fonts/DejaVuSans.ttf")
+
+      3.times do |i|
+        doc.page do |page|
+          page.font custom_font, size: 18
+          page.text "Page #{i + 1}", at: {72, 720}
+        end
+      end
+
+      bytes = doc.to_slice
+
+      # Should have 3 pages
+      content = String.new(bytes)
+      content.should contain("/Count 3")
+    end
+
+    it "saves TrueType PDF to file" do
+      doc = PDF::Document.new
+      custom_font = doc.load_font("spec/fixtures/fonts/DejaVuSans.ttf")
+
+      doc.page do |page|
+        page.font custom_font, size: 24
+        page.text "TrueType Font Test", at: {72, 720}
+      end
+
+      temp_path = File.tempname("truetype_test", ".pdf")
+      begin
+        doc.save(temp_path)
+        File.exists?(temp_path).should be_true
+        File.size(temp_path).should be > 0
+
+        content = File.read(temp_path)
+        content.should start_with("%PDF-1.7")
+        content.should contain("/CIDFontType2")
+      ensure
+        File.delete(temp_path) if File.exists?(temp_path)
+      end
+    end
+
+    it "handles subset correctly" do
+      doc = PDF::Document.new
+      custom_font = doc.load_font("spec/fixtures/fonts/DejaVuSans.ttf")
+
+      doc.page do |page|
+        page.font custom_font, size: 12
+        page.text "ABC", at: {72, 720}
+      end
+
+      bytes1 = doc.to_slice
+
+      # Create another document with more text
+      doc2 = PDF::Document.new
+      custom_font2 = doc2.load_font("spec/fixtures/fonts/DejaVuSans.ttf")
+
+      doc2.page do |page|
+        page.font custom_font2, size: 12
+        page.text "The quick brown fox jumps over the lazy dog.", at: {72, 720}
+      end
+
+      bytes2 = doc2.to_slice
+
+      # The second PDF should be larger due to more glyphs
+      # (This is a rough test - exact sizes depend on subsetting)
+      bytes2.size.should be > bytes1.size
+    end
+  end
 end

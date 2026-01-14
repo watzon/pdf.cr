@@ -57,11 +57,15 @@ module PDF
     # Registered fonts (name -> font object)
     @fonts : Hash(String, Fonts::Base)
 
+    # Loaded TrueType fonts (path -> font object)
+    @truetype_fonts : Hash(String, Fonts::TrueTypeFont)
+
     def initialize
       @objects = [] of Objects::Indirect
       @pages = [] of Page
       @next_object_id = 1
       @fonts = {} of String => Fonts::Base
+      @truetype_fonts = {} of String => Fonts::TrueTypeFont
     end
 
     # Creates a new page and yields it for content.
@@ -117,9 +121,35 @@ module PDF
           font = Fonts::Type1.new(name)
           font
         else
-          raise ArgumentError.new("Unknown font: #{name}. TrueType embedding not yet implemented.")
+          raise ArgumentError.new("Unknown font: #{name}. Use load_font to load TrueType fonts.")
         end
       end
+    end
+
+    # Loads a TrueType font from a file path.
+    #
+    # The font will be automatically subsetted to include only the glyphs
+    # used in the document.
+    #
+    # ```
+    # my_font = pdf.load_font("./fonts/OpenSans-Regular.ttf")
+    # pdf.page do |page|
+    #   page.font my_font, size: 12
+    #   page.text "Hello!", at: {72, 720}
+    # end
+    # ```
+    def load_font(path : String) : Fonts::TrueTypeFont
+      @truetype_fonts[path] ||= Fonts::TrueTypeFont.load(path)
+    end
+
+    # Loads a TrueType font from bytes.
+    def load_font(data : Bytes, name : String = "embedded") : Fonts::TrueTypeFont
+      @truetype_fonts[name] ||= Fonts::TrueTypeFont.load(data)
+    end
+
+    # Gets all TrueType fonts used in this document.
+    def truetype_fonts : Hash(String, Fonts::TrueTypeFont)
+      @truetype_fonts
     end
 
     # Saves the document to a file.
