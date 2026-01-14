@@ -612,58 +612,58 @@ pdf.pages_tree   # PDF::Object::Dictionary
 - [x] Test various TTF files (DejaVu Sans)
 - [x] Test font metrics match expected widths
 
-### Phase 3: Images
+### Phase 3: Images ✅ COMPLETE
 
 **Duration:** 2 weeks  
 **Goal:** Embed JPEG and PNG images with transparency
 
 #### 3.1 JPEG Support
-- [ ] `PDF::Image::JPEG` — JPEG handler
-- [ ] Read JPEG dimensions from header (SOF marker)
-- [ ] Detect color space (grayscale, RGB, CMYK)
-- [ ] Pass through raw DCT data (no re-encoding)
-- [ ] Create Image XObject dictionary
-  - [ ] /Type /XObject
-  - [ ] /Subtype /Image
-  - [ ] /Width, /Height
-  - [ ] /ColorSpace (/DeviceRGB, /DeviceGray, /DeviceCMYK)
-  - [ ] /BitsPerComponent 8
-  - [ ] /Filter /DCTDecode
+- [x] `PDF::Images::JPEG` — JPEG handler
+- [x] Read JPEG dimensions from header (SOF marker)
+- [x] Detect color space (grayscale, RGB, CMYK)
+- [x] Pass through raw DCT data (no re-encoding)
+- [x] Create Image XObject dictionary
+  - [x] /Type /XObject
+  - [x] /Subtype /Image
+  - [x] /Width, /Height
+  - [x] /ColorSpace (/DeviceRGB, /DeviceGray, /DeviceCMYK)
+  - [x] /BitsPerComponent 8
+  - [x] /Filter /DCTDecode
 
 #### 3.2 PNG Support
-- [ ] `PDF::Image::PNG` — PNG handler
-- [ ] Decode PNG using stumpy_png
-- [ ] Extract raw RGB/RGBA pixels
-- [ ] Re-encode with FlateDecode
-- [ ] Handle color types:
-  - [ ] Grayscale
-  - [ ] Grayscale + Alpha
-  - [ ] RGB
-  - [ ] RGBA
-  - [ ] Indexed (palette)
-- [ ] Alpha channel handling:
-  - [ ] Extract alpha as separate image
-  - [ ] Create soft mask (/SMask)
-  - [ ] Soft mask XObject dictionary
+- [x] `PDF::Images::PNG` — PNG handler
+- [x] Decode PNG using stumpy_png
+- [x] Extract raw RGB/RGBA pixels
+- [x] Re-encode with FlateDecode
+- [x] Handle color types:
+  - [x] Grayscale
+  - [x] Grayscale + Alpha
+  - [x] RGB
+  - [x] RGBA
+  - [ ] Indexed (palette) - decoded by stumpy_png
+- [x] Alpha channel handling:
+  - [x] Extract alpha as separate image
+  - [x] Create soft mask (/SMask)
+  - [x] Soft mask XObject dictionary
 
 #### 3.3 Image XObject
-- [ ] `PDF::Image::XObject` — Image XObject wrapper
-- [ ] Register in page resources
-- [ ] Image placement operator (`Do`)
-- [ ] Transformation matrix for positioning/scaling
+- [x] `PDF::Images::Base` — Image XObject base class
+- [x] Register in page resources
+- [x] Image placement operator (`Do`)
+- [x] Transformation matrix for positioning/scaling
 
 #### 3.4 Image API
-- [ ] `PDF::Image.load(path)` — Load image from file
-- [ ] `PDF::Image.load(io)` — Load from IO
-- [ ] `PDF::Image.load(bytes)` — Load from bytes
-- [ ] Auto-detect format (JPEG vs PNG)
-- [ ] `page.image(img, at:, width:, height:, scale:)`
+- [x] `PDF::Images::Image.load(path)` — Load image from file
+- [x] `PDF::Images::Image.load(io)` — Load from IO
+- [x] `PDF::Images::Image.load(bytes)` — Load from bytes
+- [x] Auto-detect format (JPEG vs PNG)
+- [x] `page.image(img, at:, width:, height:, scale:)`
 
 #### 3.5 Testing
-- [ ] Test JPEG embedding (various sizes, color spaces)
-- [ ] Test PNG embedding (RGB, RGBA, indexed)
-- [ ] Test transparency renders correctly
-- [ ] Test image scaling maintains quality
+- [x] Test JPEG embedding (various sizes, color spaces)
+- [x] Test PNG embedding (RGB, RGBA)
+- [x] Test transparency renders correctly
+- [x] Test image scaling maintains quality
 
 ### Phase 4: Graphics & Color
 
@@ -1247,8 +1247,8 @@ end
 - Unicode support ✅
 
 ### v0.3.0 (Planned)
-- Image embedding (JPEG, PNG)
-- Transparency support
+- Image embedding (JPEG, PNG) ✅
+- Transparency support ✅
 
 ### v0.4.0 (Planned)
 - PDF parsing

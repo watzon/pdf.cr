@@ -25,6 +25,11 @@ module PDF
         # Finalize the document (creates all objects)
         @document.finalize!
 
+        # Register info dictionary BEFORE writing objects so it's in the xref
+        info_ref = if info = @document.info_dict
+                     @document.register_object(info).reference
+                   end
+
         # Track current position
         position = 0_i64
 
@@ -48,7 +53,7 @@ module PDF
         position += xref.bytesize
 
         # Write trailer
-        trailer = write_trailer(xref_start)
+        trailer = write_trailer(xref_start, info_ref)
         io << trailer
       end
 
@@ -78,17 +83,16 @@ module PDF
         end
       end
 
-      private def write_trailer(xref_start : Int64) : String
+      private def write_trailer(xref_start : Int64, info_ref : Objects::Reference?) : String
         String.build do |io|
           io << "trailer\n"
           io << "<<"
           io << "/Size #{@document.objects.size + 1}"
           io << "/Root #{@document.catalog.reference.to_pdf}"
 
-          # Add info dictionary if present
-          if info = @document.info_dict
-            info_obj = @document.register_object(info)
-            io << "/Info #{info_obj.reference.to_pdf}"
+          # Add info dictionary reference if present
+          if ref = info_ref
+            io << "/Info #{ref.to_pdf}"
           end
 
           io << ">>\n"

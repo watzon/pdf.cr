@@ -37,12 +37,19 @@ require "./pdf/objects/indirect"
 # Filters (compression/encoding)
 require "./pdf/filters/base"
 require "./pdf/filters/flate"
+require "./pdf/filters/dct"
 
 # Font handling
 require "./pdf/fonts/base"
 require "./pdf/fonts/type1"
 require "./pdf/fonts/truetype"
 require "./pdf/fonts/truetype_font"
+
+# Image handling
+require "./pdf/images/base"
+require "./pdf/images/jpeg"
+require "./pdf/images/png"
+require "./pdf/images/image"
 
 # Document writer
 require "./pdf/writer/document_writer"

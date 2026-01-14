@@ -38,6 +38,9 @@ module PDF
     # TrueType font resources (font object -> resource data)
     @truetype_font_resources : Hash(Fonts::TrueTypeFont, TrueTypeFontResources)
 
+    # Image resources used on this page (image object -> resource data)
+    @image_resources : Hash(Images::Base, ImageResources)
+
     # The page's indirect object (set after finalization)
     @page_object : Objects::Indirect?
 
@@ -56,10 +59,21 @@ module PDF
       end
     end
 
+    # Resource data for an image on this page
+    private struct ImageResources
+      getter image_ref : Objects::Reference?
+      getter soft_mask_ref : Objects::Reference?
+      getter key : String
+
+      def initialize(@image_ref : Objects::Reference?, @soft_mask_ref : Objects::Reference?, @key : String)
+      end
+    end
+
     def initialize(@document : Document, @width : Float64 = 612.0, @height : Float64 = 792.0)
       @content = IO::Memory.new
       @font_resources = {} of String => Objects::Reference
       @truetype_font_resources = {} of Fonts::TrueTypeFont => TrueTypeFontResources
+      @image_resources = {} of Images::Base => ImageResources
     end
 
     # Sets the current font for subsequent text operations.
@@ -152,6 +166,76 @@ module PDF
       self
     end
 
+    # Draws an image at the specified position.
+    #
+    # Position is in points from the bottom-left corner of the page.
+    # You can specify either width, height, or scale to control size.
+    # If only width or height is given, aspect ratio is maintained.
+    #
+    # ```
+    # image = PDF::Images::Image.load("photo.jpg")
+    # page.image image, at: {72, 500}, width: 200
+    # page.image image, at: {300, 500}, height: 150
+    # page.image image, at: {72, 200}, scale: 0.5
+    # ```
+    def image(img : Images::Base, *, at : Tuple(Number, Number), width : Number? = nil, height : Number? = nil, scale : Number? = nil) : self
+      x, y = at
+
+      # Calculate display dimensions
+      display_width, display_height = calculate_image_dimensions(img, width, height, scale)
+
+      # Register image resource if not already done
+      unless @image_resources.has_key?(img)
+        register_image(img)
+      end
+
+      image_key = @image_resources[img].key
+
+      # Draw image using transformation matrix
+      # The 'Do' operator draws an XObject, but images are always 1x1 unit
+      # so we need to scale to the desired size and translate to position
+      @content << "q\n" # Save graphics state
+      @content << "#{format_number(display_width.to_f)} 0 0 #{format_number(display_height.to_f)} "
+      @content << "#{format_number(x.to_f)} #{format_number(y.to_f)} cm\n"
+      @content << "/#{image_key} Do\n"
+      @content << "Q\n" # Restore graphics state
+
+      self
+    end
+
+    # Registers an image and prepares it for embedding
+    private def register_image(img : Images::Base) : Nil
+      key = "Im#{@image_resources.size + 1}"
+
+      # We defer actual object creation until finalization
+      @image_resources[img] = ImageResources.new(nil, nil, key)
+    end
+
+    # Calculate display dimensions for an image
+    private def calculate_image_dimensions(img : Images::Base, width : Number?, height : Number?, scale : Number?) : Tuple(Float64, Float64)
+      original_width = img.width.to_f
+      original_height = img.height.to_f
+
+      if scale
+        # Scale both dimensions
+        {original_width * scale.to_f, original_height * scale.to_f}
+      elsif width && height
+        # Explicit dimensions (may distort)
+        {width.to_f, height.to_f}
+      elsif width
+        # Scale height to maintain aspect ratio
+        ratio = width.to_f / original_width
+        {width.to_f, original_height * ratio}
+      elsif height
+        # Scale width to maintain aspect ratio
+        ratio = height.to_f / original_height
+        {original_width * ratio, height.to_f}
+      else
+        # Use original dimensions
+        {original_width, original_height}
+      end
+    end
+
     # Sets the stroke color (RGB, values 0.0 to 1.0).
     def stroke_color(r : Number, g : Number, b : Number) : self
       @content << "#{format_number(r.to_f)} #{format_number(g.to_f)} #{format_number(b.to_f)} RG\n"
@@ -236,6 +320,9 @@ module PDF
       # Register TrueType font objects
       finalize_truetype_fonts!
 
+      # Register image objects
+      finalize_images!
+
       # Create content stream
       content_data = @content.to_s
       stream = Objects::Stream.new
@@ -287,6 +374,38 @@ module PDF
       end
     end
 
+    # Creates all PDF objects for images
+    private def finalize_images! : Nil
+      @image_resources.each do |img, resources|
+        soft_mask_ref : Objects::Reference? = nil
+
+        # Create soft mask stream first (if image has alpha)
+        if img.has_alpha?
+          if soft_mask_stream = img.soft_mask_stream
+            soft_mask_obj = @document.register_object(soft_mask_stream)
+            soft_mask_ref = soft_mask_obj.reference
+          end
+        end
+
+        # Create main image stream
+        image_stream = img.to_stream
+
+        # Add soft mask reference if we have one
+        if ref = soft_mask_ref
+          image_stream["SMask"] = ref
+        end
+
+        image_obj = @document.register_object(image_stream)
+
+        # Update the resource reference
+        @image_resources[img] = ImageResources.new(
+          image_obj.reference,
+          soft_mask_ref,
+          resources.key
+        )
+      end
+    end
+
     # Converts this page to an indirect object.
     def to_indirect_object(parent_ref : Objects::Reference) : Objects::Indirect
       finalize! unless @finalized
@@ -333,10 +452,24 @@ module PDF
         resources["Font"] = font_dict
       end
 
+      # Add XObject resources (images)
+      if !@image_resources.empty?
+        xobject_dict = Objects::Dictionary.new
+
+        @image_resources.each do |_, res|
+          if ref = res.image_ref
+            xobject_dict[res.key] = ref
+          end
+        end
+
+        resources["XObject"] = xobject_dict unless xobject_dict.empty?
+      end
+
       # ProcSet (required for some viewers)
       procset = Objects::Array.new
       procset << Objects::Name.new("PDF")
       procset << Objects::Name.new("Text")
+      procset << Objects::Name.new("ImageC") if !@image_resources.empty?
       resources["ProcSet"] = procset
 
       resources

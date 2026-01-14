@@ -82,7 +82,15 @@ module PDF
         @dictionary[key]
       end
 
+      def [](key : String) : Base
+        @dictionary[key]
+      end
+
       def []?(key : Name) : Base?
+        @dictionary[key]?
+      end
+
+      def []?(key : String) : Base?
         @dictionary[key]?
       end
 

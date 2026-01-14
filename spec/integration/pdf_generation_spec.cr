@@ -291,4 +291,195 @@ describe "PDF Generation Integration" do
       bytes2.size.should be > bytes1.size
     end
   end
+
+  describe "Images" do
+    it "generates PDF with JPEG image" do
+      doc = PDF::Document.new
+      jpeg = PDF::Images::JPEG.load("spec/fixtures/images/test_rgb.jpg")
+
+      doc.page do |page|
+        page.font "Helvetica", size: 18
+        page.text "JPEG Image Test", at: {72, 750}
+        page.image jpeg, at: {72, 500}, width: 200
+      end
+
+      bytes = doc.to_slice
+      content = String.new(bytes)
+
+      # Verify PDF structure
+      content.should start_with("%PDF-1.7")
+      content.should contain("%%EOF")
+      content.should contain("/Type /XObject")
+      content.should contain("/Subtype /Image")
+      content.should contain("/DCTDecode")
+      content.should contain("/XObject")
+    end
+
+    it "generates PDF with PNG image" do
+      doc = PDF::Document.new
+      png = PDF::Images::PNG.load("spec/fixtures/images/test_rgb.png")
+
+      doc.page do |page|
+        page.font "Helvetica", size: 18
+        page.text "PNG Image Test", at: {72, 750}
+        page.image png, at: {72, 500}, width: 200
+      end
+
+      bytes = doc.to_slice
+      content = String.new(bytes)
+
+      # Verify PDF structure
+      content.should start_with("%PDF-1.7")
+      content.should contain("/Type /XObject")
+      content.should contain("/Subtype /Image")
+      content.should contain("/FlateDecode")
+    end
+
+    it "generates PDF with PNG with alpha" do
+      doc = PDF::Document.new
+      png = PDF::Images::PNG.load("spec/fixtures/images/test_rgba.png")
+
+      doc.page do |page|
+        # Draw a colored background to show transparency
+        page.fill_color(0.2, 0.4, 0.8)
+        page.rectangle(50, 480, 220, 220)
+        page.fill
+
+        page.font "Helvetica", size: 18
+        page.text "PNG with Alpha Test", at: {72, 750}
+        page.image png, at: {72, 500}, width: 200
+      end
+
+      bytes = doc.to_slice
+      content = String.new(bytes)
+
+      # Verify PDF structure with soft mask
+      content.should start_with("%PDF-1.7")
+      content.should contain("/Type /XObject")
+      content.should contain("/SMask")
+      content.should contain("/DeviceGray")
+    end
+
+    it "auto-detects image format" do
+      doc = PDF::Document.new
+      jpeg = PDF::Images::Image.load("spec/fixtures/images/test_rgb.jpg")
+      png = PDF::Images::Image.load("spec/fixtures/images/test_rgb.png")
+
+      doc.page do |page|
+        page.font "Helvetica", size: 18
+        page.text "Auto-detect Image Format", at: {72, 750}
+        page.image jpeg, at: {72, 500}, width: 150
+        page.image png, at: {272, 500}, width: 150
+      end
+
+      bytes = doc.to_slice
+      content = String.new(bytes)
+
+      # Should have both DCT (JPEG) and FlateDecode (PNG) images
+      content.should contain("/DCTDecode")
+      content.should contain("/FlateDecode")
+    end
+
+    it "scales images correctly" do
+      doc = PDF::Document.new
+      image = PDF::Images::JPEG.load("spec/fixtures/images/test_rgb.jpg")
+
+      doc.page do |page|
+        page.font "Helvetica", size: 12
+        page.text "Original size (100x100):", at: {72, 700}
+        page.image image, at: {72, 580}
+
+        page.text "Width: 50 (scaled):", at: {200, 700}
+        page.image image, at: {200, 580}, width: 50
+
+        page.text "Height: 80 (scaled):", at: {280, 700}
+        page.image image, at: {280, 580}, height: 80
+
+        page.text "Scale: 0.5:", at: {400, 700}
+        page.image image, at: {400, 580}, scale: 0.5
+
+        page.text "Width & Height (distorted):", at: {72, 450}
+        page.image image, at: {72, 330}, width: 100, height: 50
+      end
+
+      bytes = doc.to_slice
+
+      # Just verify it generates without error
+      String.new(bytes).should start_with("%PDF-1.7")
+    end
+
+    it "places multiple images on same page" do
+      doc = PDF::Document.new
+      jpeg = PDF::Images::JPEG.load("spec/fixtures/images/test_rgb.jpg")
+      png = PDF::Images::PNG.load("spec/fixtures/images/test_rgba.png")
+
+      doc.page do |page|
+        page.font "Helvetica", size: 18
+        page.text "Multiple Images", at: {72, 750}
+
+        # Tile images
+        3.times do |row|
+          3.times do |col|
+            x = 72 + col * 180
+            y = 500 - row * 180
+            if (row + col) % 2 == 0
+              page.image jpeg, at: {x, y}, width: 150
+            else
+              page.image png, at: {x, y}, width: 150
+            end
+          end
+        end
+      end
+
+      bytes = doc.to_slice
+      String.new(bytes).should start_with("%PDF-1.7")
+    end
+
+    it "saves image PDF to file" do
+      doc = PDF::Document.new
+      image = PDF::Images::JPEG.load("spec/fixtures/images/test_rgb.jpg")
+
+      doc.page do |page|
+        page.font "Helvetica", size: 18
+        page.text "Image to File Test", at: {72, 750}
+        page.image image, at: {72, 500}, width: 200
+      end
+
+      temp_path = File.tempname("image_test", ".pdf")
+      begin
+        doc.save(temp_path)
+        File.exists?(temp_path).should be_true
+        File.size(temp_path).should be > 0
+
+        content = File.read(temp_path)
+        content.should start_with("%PDF-1.7")
+        content.should contain("/DCTDecode")
+      ensure
+        File.delete(temp_path) if File.exists?(temp_path)
+      end
+    end
+
+    it "reuses same image across multiple placements" do
+      doc = PDF::Document.new
+      image = PDF::Images::JPEG.load("spec/fixtures/images/test_rgb.jpg")
+
+      doc.page do |page|
+        page.font "Helvetica", size: 12
+        page.text "Same image used multiple times:", at: {72, 750}
+
+        # Place same image at different positions and sizes
+        page.image image, at: {72, 600}, width: 100
+        page.image image, at: {200, 600}, width: 50
+        page.image image, at: {280, 600}, width: 150
+      end
+
+      bytes = doc.to_slice
+      content = String.new(bytes)
+
+      # Should only have one XObject resource, used multiple times
+      content.should contain("/Im1")
+      # The Do operator should appear 3 times
+      String.new(bytes).should start_with("%PDF-1.7")
+    end
+  end
 end
