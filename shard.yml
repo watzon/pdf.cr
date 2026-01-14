@@ -1,0 +1,26 @@
+name: pdf
+version: 0.1.0
+
+description: |
+  A pure Crystal library for PDF generation and parsing.
+  Create, modify, and read PDF documents with a clean, idiomatic API.
+
+authors:
+  - Chris Watson <cawatson1993@gmail.com>
+
+crystal: ">= 1.10.0"
+
+license: MIT
+
+dependencies:
+  stumpy_png:
+    github: stumpycr/stumpy_png
+    version: "~> 5.0"
+  stumpy_jpeg:
+    github: stumpycr/stumpy_jpeg
+    branch: master
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+    version: "~> 1.6"
