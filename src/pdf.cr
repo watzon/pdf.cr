@@ -33,11 +33,16 @@ require "./pdf/objects/dictionary"
 require "./pdf/objects/reference"
 require "./pdf/objects/stream"
 require "./pdf/objects/indirect"
+require "./pdf/objects/ext_g_state"
 
 # Filters (compression/encoding)
 require "./pdf/filters/base"
 require "./pdf/filters/flate"
 require "./pdf/filters/dct"
+
+# Content stream operations
+require "./pdf/content/color"
+require "./pdf/content/graphics_state"
 
 # Font handling
 require "./pdf/fonts/base"

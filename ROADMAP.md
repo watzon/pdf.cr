@@ -665,100 +665,100 @@ pdf.pages_tree   # PDF::Object::Dictionary
 - [x] Test transparency renders correctly
 - [x] Test image scaling maintains quality
 
-### Phase 4: Graphics & Color
+### Phase 4: Graphics & Color ✅ COMPLETE
 
 **Duration:** 2 weeks  
 **Goal:** Full vector graphics capabilities
 
 #### 4.1 Path Operations
-- [ ] `PDF::Content::Path` — Path construction
-- [ ] Path operators:
-  - [ ] `m` — Move to
-  - [ ] `l` — Line to
-  - [ ] `c` — Cubic Bezier curve (two control points)
-  - [ ] `v` — Cubic Bezier (first control = current point)
-  - [ ] `y` — Cubic Bezier (second control = end point)
-  - [ ] `h` — Close path
-  - [ ] `re` — Rectangle
-- [ ] Path painting operators:
-  - [ ] `S` — Stroke
-  - [ ] `s` — Close and stroke
-  - [ ] `f` — Fill (non-zero winding)
-  - [ ] `f*` — Fill (even-odd)
-  - [ ] `B` — Fill and stroke
-  - [ ] `B*` — Fill (even-odd) and stroke
-  - [ ] `b` — Close, fill, stroke
-  - [ ] `b*` — Close, fill (even-odd), stroke
-  - [ ] `n` — End path (no paint)
-- [ ] Clipping:
-  - [ ] `W` — Clip (non-zero winding)
-  - [ ] `W*` — Clip (even-odd)
+- [x] `PDF::Content::Path` — Path construction (integrated into Page class)
+- [x] Path operators:
+  - [x] `m` — Move to
+  - [x] `l` — Line to
+  - [x] `c` — Cubic Bezier curve (two control points)
+  - [x] `v` — Cubic Bezier (first control = current point)
+  - [x] `y` — Cubic Bezier (second control = end point)
+  - [x] `h` — Close path
+  - [x] `re` — Rectangle
+- [x] Path painting operators:
+  - [x] `S` — Stroke
+  - [x] `s` — Close and stroke
+  - [x] `f` — Fill (non-zero winding)
+  - [x] `f*` — Fill (even-odd)
+  - [x] `B` — Fill and stroke
+  - [x] `B*` — Fill (even-odd) and stroke
+  - [x] `b` — Close, fill, stroke
+  - [x] `b*` — Close, fill (even-odd), stroke
+  - [x] `n` — End path (no paint)
+- [x] Clipping:
+  - [x] `W` — Clip (non-zero winding)
+  - [x] `W*` — Clip (even-odd)
 
 #### 4.2 Graphics State
-- [ ] `PDF::Content::Graphics` — Graphics state management
-- [ ] State operators:
-  - [ ] `q` — Save graphics state
-  - [ ] `Q` — Restore graphics state
-  - [ ] `cm` — Concatenate transformation matrix
-  - [ ] `w` — Line width
-  - [ ] `J` — Line cap style
-  - [ ] `j` — Line join style
-  - [ ] `M` — Miter limit
-  - [ ] `d` — Dash pattern
-  - [ ] `ri` — Rendering intent
-  - [ ] `i` — Flatness tolerance
-  - [ ] `gs` — Set graphics state from ExtGState
-- [ ] Transformation helpers:
-  - [ ] `translate(x, y)`
-  - [ ] `rotate(degrees)`
-  - [ ] `scale(sx, sy)`
-  - [ ] `skew(ax, ay)`
-  - [ ] `transform(a, b, c, d, e, f)`
+- [x] `PDF::Content::Graphics` — Graphics state management (integrated into Page class)
+- [x] State operators:
+  - [x] `q` — Save graphics state
+  - [x] `Q` — Restore graphics state
+  - [x] `cm` — Concatenate transformation matrix
+  - [x] `w` — Line width
+  - [x] `J` — Line cap style
+  - [x] `j` — Line join style
+  - [x] `M` — Miter limit
+  - [x] `d` — Dash pattern
+  - [x] `ri` — Rendering intent
+  - [x] `i` — Flatness tolerance
+  - [x] `gs` — Set graphics state from ExtGState
+- [x] Transformation helpers:
+  - [x] `translate(x, y)`
+  - [x] `rotate(degrees)`
+  - [x] `scale(sx, sy)`
+  - [x] `skew(ax, ay)`
+  - [x] `transform(a, b, c, d, e, f)`
 
 #### 4.3 Color Operations
-- [ ] `PDF::Content::Color` — Color management
-- [ ] Device color spaces:
-  - [ ] DeviceGray: `g` (fill), `G` (stroke)
-  - [ ] DeviceRGB: `rg` (fill), `RG` (stroke)
-  - [ ] DeviceCMYK: `k` (fill), `K` (stroke)
-- [ ] Color space operators:
-  - [ ] `cs` — Set fill color space
-  - [ ] `CS` — Set stroke color space
-  - [ ] `sc` / `scn` — Set fill color
-  - [ ] `SC` / `SCN` — Set stroke color
-- [ ] Named colors (convenience):
-  - [ ] `:black`, `:white`, `:red`, `:green`, `:blue`, etc.
-  - [ ] Hex color strings (`"#FF0000"`)
+- [x] `PDF::Content::Color` — Color management
+- [x] Device color spaces:
+  - [x] DeviceGray: `g` (fill), `G` (stroke)
+  - [x] DeviceRGB: `rg` (fill), `RG` (stroke)
+  - [x] DeviceCMYK: `k` (fill), `K` (stroke)
+- [x] Color space operators:
+  - [x] `cs` — Set fill color space
+  - [x] `CS` — Set stroke color space
+  - [x] `sc` / `scn` — Set fill color (basic support)
+  - [x] `SC` / `SCN` — Set stroke color (basic support)
+- [x] Named colors (convenience):
+  - [x] `:black`, `:white`, `:red`, `:green`, `:blue`, etc.
+  - [x] Hex color strings (`"#FF0000"`)
 
 #### 4.4 Extended Graphics State
-- [ ] `PDF::Object::ExtGState` — Extended graphics state dictionary
-- [ ] Transparency:
-  - [ ] `/CA` — Stroke opacity
-  - [ ] `/ca` — Fill opacity
-  - [ ] `/BM` — Blend mode
-  - [ ] `/SMask` — Soft mask
-- [ ] Other parameters:
-  - [ ] `/LW` — Line width
-  - [ ] `/LC` — Line cap
-  - [ ] `/LJ` — Line join
-  - [ ] `/ML` — Miter limit
-  - [ ] `/D` — Dash pattern
-- [ ] Register ExtGState in resources
+- [x] `PDF::Object::ExtGState` — Extended graphics state dictionary
+- [x] Transparency:
+  - [x] `/CA` — Stroke opacity
+  - [x] `/ca` — Fill opacity
+  - [x] `/BM` — Blend mode
+  - [x] `/SMask` — Soft mask (placeholder)
+- [x] Other parameters:
+  - [x] `/LW` — Line width
+  - [x] `/LC` — Line cap
+  - [x] `/LJ` — Line join
+  - [x] `/ML` — Miter limit
+  - [x] `/D` — Dash pattern
+- [x] Register ExtGState in resources
 
 #### 4.5 Shape Helpers
-- [ ] `page.rectangle(x, y, w, h)`
-- [ ] `page.circle(cx, cy, r)` — Approximated with Bezier curves
-- [ ] `page.ellipse(cx, cy, rx, ry)`
-- [ ] `page.polygon(points)`
-- [ ] `page.rounded_rectangle(x, y, w, h, radius)`
-- [ ] `page.arc(cx, cy, r, start_angle, end_angle)`
+- [x] `page.rectangle(x, y, w, h)`
+- [x] `page.circle(cx, cy, r)` — Approximated with Bezier curves
+- [x] `page.ellipse(cx, cy, rx, ry)`
+- [x] `page.polygon(points)`
+- [x] `page.rounded_rectangle(x, y, w, h, radius)`
+- [x] `page.arc(cx, cy, r, start_angle, end_angle)`
 
 #### 4.6 Testing
-- [ ] Test all path operators
-- [ ] Test transformations
-- [ ] Test transparency
-- [ ] Test color spaces
-- [ ] Visual verification of rendered output
+- [x] Test all path operators
+- [x] Test transformations
+- [x] Test transparency
+- [x] Test color spaces
+- [x] Visual verification of rendered output
 
 ### Phase 5: Parser Core
 
@@ -1251,6 +1251,13 @@ end
 - Transparency support ✅
 
 ### v0.4.0 (Planned)
+- Full vector graphics capabilities ✅
+- Color management (RGB, CMYK, Grayscale) ✅
+- Extended graphics state (transparency, blend modes) ✅
+- Transformations (translate, rotate, scale, skew) ✅
+- Shape helpers (circle, ellipse, polygon, rounded rectangle, arc) ✅
+
+### v0.5.0 (Planned)
 - PDF parsing
 - Text extraction
 
