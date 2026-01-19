@@ -1,32 +1,41 @@
 # pdf.cr
 
+[![CI](https://github.com/watzon/pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/watzon/pdf/actions/workflows/ci.yml)
+[![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
+
 A pure Crystal library for PDF generation and parsing.
 
-[![CI](https://github.com/watzon/pdf/actions/workflows/ci.yml/badge.svg)](https://github.com/watzon/pdf/actions/workflows/ci.yml)
+PDF.cr is a high-performance, pure-Crystal implementation of the PDF 1.7 (ISO 32000-1) specification. It is designed to be a reliable, easy-to-use alternative to C-based libraries like libharu, providing a native Crystal experience for generating and (eventually) parsing PDF documents.
 
-## Features
+## Table of Contents
 
-- **Pure Crystal** — No C dependencies, easy installation via shards
-- **PDF 1.7 compliant** — Generates modern, standards-compliant PDFs
-- **Type1 fonts** — Built-in support for all 14 standard PDF fonts
-- **TrueType fonts** — Load any .ttf font with automatic subsetting and full Unicode support
-- **Vector graphics** — Lines, rectangles, colors, and more
-- **Compression** — FlateDecode compression for smaller files
-- **Multi-page** — Create documents with any number of pages
+- [Background](#background)
+- [Install](#install)
+- [Usage](#usage)
+- [API](#api)
+- [Maintainers](#maintainers)
+- [Contributing](#contributing)
+- [License](#license)
 
-## Installation
+## Background
 
-1. Add the dependency to your `shard.yml`:
+The motivation behind `pdf.cr` was to create a PDF generation library for the Crystal ecosystem that doesn't rely on external C dependencies. While libraries like `libharu` are powerful, they can be difficult to manage in containerized environments or cross-platform builds. By being written in pure Crystal, `pdf.cr` ensures maximum portability and ease of installation, while leveraging Crystal's performance and type safety.
 
-   ```yaml
-   dependencies:
-     pdf:
-       github: watzon/pdf
-   ```
+## Install
 
-2. Run `shards install`
+Add the dependency to your `shard.yml`:
 
-## Quick Start
+```yaml
+dependencies:
+  pdf:
+    github: watzon/pdf
+```
+
+Then run `shards install`.
+
+## Usage
+
+### Quick Start
 
 ```crystal
 require "pdf"
@@ -48,8 +57,6 @@ end
 # Save to file
 pdf.save("output.pdf")
 ```
-
-## Usage
 
 ### Page Sizes
 
@@ -181,44 +188,38 @@ pdf.page { |page| page.font("Helvetica", size: 12) }
 bytes = pdf.to_slice
 ```
 
-## Roadmap
+## API
 
-See [ROADMAP.md](ROADMAP.md) for the full development plan.
+### PDF::Document
 
-### Completed
-- [x] PDF object model (Boolean, Number, String, Name, Array, Dictionary, Stream)
-- [x] Document structure (Catalog, Pages, Page)
-- [x] Type1 font support with glyph metrics
-- [x] TrueType font embedding with subsetting and Unicode support
-- [x] Basic text rendering
-- [x] Vector graphics (lines, rectangles)
-- [x] FlateDecode compression
-- [x] Multi-page documents
+The `PDF::Document` class is the main entry point for creating and managing PDF files. It handles the document-wide resources, metadata, and page management.
 
-### Coming Soon
-- [ ] OpenType font support (CFF outlines)
-- [ ] Image embedding (JPEG, PNG)
-- [ ] PDF parsing and text extraction
-- [ ] Advanced text layout
-- [ ] Annotations and links
+- `initialize`: Creates a new document.
+- `page(size, orientation, &block)`: Adds a new page to the document and yields a `PDF::Page` object.
+- `load_font(path)`: Loads a TrueType font for use in the document.
+- `save(path)`: Serializes the document and writes it to a file.
+- `to_slice`: Returns the serialized document as a `Bytes` slice.
 
-## Development
+### PDF::Page
 
-```bash
-# Install dependencies
-shards install
+The `PDF::Page` class represents a single page and provides a high-level DSL for drawing content.
 
-# Run tests
-crystal spec
+- `font(name_or_font, size)`: Sets the current font and size.
+- `text(string, at)`: Draws text at the specified coordinates.
+- `rectangle(x, y, width, height)`: Defines a rectangular path.
+- `move_to(x, y)` / `line_to(x, y)`: Path construction methods.
+- `stroke`, `fill`, `fill_stroke`: Path painting operations.
+- `save_graphics_state(&block)`: Saves the current graphics state, executes the block, and restores it.
 
-# Run linter
-bin/ameba
+## Maintainers
 
-# Format code
-crystal tool format
-```
+- [Chris Watson](https://github.com/watzon)
 
 ## Contributing
+
+PRs accepted.
+
+Small note: If editing the README, please conform to the [standard-readme](https://github.com/RichardLitt/standard-readme) specification.
 
 1. Fork it (<https://github.com/watzon/pdf/fork>)
 2. Create your feature branch (`git checkout -b my-new-feature`)
@@ -228,8 +229,4 @@ crystal tool format
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
-
-## Contributors
-
-- [Chris Watson](https://github.com/watzon) - creator and maintainer
+MIT © Chris Watson
