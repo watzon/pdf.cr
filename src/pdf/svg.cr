@@ -1,0 +1,5 @@
+require "./svg/color"
+require "./svg/transform"
+require "./svg/path_parser"
+require "./svg/parser"
+require "./svg/renderer"
