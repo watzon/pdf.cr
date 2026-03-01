@@ -62,7 +62,11 @@ require "./pdf/writer/document_writer"
 # Text layout engine
 require "./pdf/text/formatted"
 
+# Layout engine
+require "./pdf/layout"
+
 # Document structure
 require "./pdf/document"
 require "./pdf/page"
 require "./pdf/page_formatted_text"
+require "./pdf/page_bounding_box"
