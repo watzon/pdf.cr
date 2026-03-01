@@ -59,6 +59,10 @@ require "./pdf/images/image"
 # Document writer
 require "./pdf/writer/document_writer"
 
+# Text layout engine
+require "./pdf/text/formatted"
+
 # Document structure
 require "./pdf/document"
 require "./pdf/page"
+require "./pdf/page_formatted_text"
