@@ -21,7 +21,7 @@ module PDF
       column_widths : Array(Float64)? = nil,
       table_width : Float64? = nil,
       cell_style : Hash(Symbol, String | Float64 | Bool | Nil)? = nil,
-      row_colors : Array(String)? = nil
+      row_colors : Array(String)? = nil,
     ) : Table
       table = Table.new(
         data: data,
@@ -31,7 +31,21 @@ module PDF
         cell_style: cell_style,
         row_colors: row_colors,
       )
-      table.draw(self, x: at[0].to_f, y: at[1].to_f)
+
+      margin_bottom = 50.0
+      page_width = @width
+      page_height = @height
+
+      table.draw_with_page_breaks(
+        self,
+        x: at[0].to_f,
+        y: at[1].to_f,
+        available_height: at[1].to_f - margin_bottom,
+      ) do
+        new_page = @document.page(page_width, page_height) { }
+        {new_page, new_page.height - margin_bottom}
+      end
+
       table
     end
   end

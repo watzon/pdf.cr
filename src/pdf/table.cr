@@ -57,7 +57,7 @@ module PDF
       column_widths : Array(Float64)? = nil,
       table_width : Float64? = nil,
       cell_style : Hash(Symbol, String | Float64 | Bool | Nil)? = nil,
-      row_colors : Array(String)? = nil
+      row_colors : Array(String)? = nil,
     )
       @header = header.is_a?(Bool) ? (header ? 1 : 0) : header
       @table_width = table_width
@@ -68,6 +68,8 @@ module PDF
       @cells = build_cells(data)
       @row_count = @cells.size
       @column_count = @cells.empty? ? 0 : @cells.map(&.size).max
+
+      apply_row_colors
 
       # Set column widths
       if column_widths
@@ -215,6 +217,28 @@ module PDF
       end
 
       grid
+    end
+
+    # Applies alternating row-stripe backgrounds from `row_colors`,
+    # cycling per data row (header rows are excluded from striping).
+    # A cell that already has an explicit background (from `cell_style`
+    # or per-cell data) keeps it.
+    private def apply_row_colors : Nil
+      colors = @row_colors
+      return unless colors
+      return if colors.empty?
+
+      stripe_idx = 0
+      @cells.each_with_index do |row, row_idx|
+        next if row_idx < @header
+
+        color = colors[stripe_idx % colors.size]
+        row.each do |cell|
+          next if cell.span_dummy?
+          cell.background_color ||= color
+        end
+        stripe_idx += 1
+      end
     end
 
     private def apply_cell_style(cell : Cell) : Nil

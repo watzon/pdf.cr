@@ -216,5 +216,75 @@ describe PDF::Table do
       doc.write(io)
       io.size.should be > 0
     end
+
+    it "applies row_colors as alternating cell backgrounds" do
+      table = PDF::Table.new(
+        data: [
+          ["A", "B"],
+          ["C", "D"],
+          ["E", "F"],
+        ],
+        column_widths: [100.0, 100.0],
+        row_colors: ["FFFFFF", "EEEEEE"],
+      )
+
+      table.cells[0].each(&.background_color.should eq("FFFFFF"))
+      table.cells[1].each(&.background_color.should eq("EEEEEE"))
+      table.cells[2].each(&.background_color.should eq("FFFFFF"))
+    end
+
+    it "excludes header rows from row_colors striping" do
+      table = PDF::Table.new(
+        data: [
+          ["Header 1", "Header 2"],
+          ["A", "B"],
+          ["C", "D"],
+        ],
+        header: true,
+        column_widths: [100.0, 100.0],
+        row_colors: ["FFFFFF", "EEEEEE"],
+      )
+
+      table.cells[0].each(&.background_color.should be_nil)
+      table.cells[1].each(&.background_color.should eq("FFFFFF"))
+      table.cells[2].each(&.background_color.should eq("EEEEEE"))
+    end
+
+    it "does not override an explicit per-cell background with row_colors" do
+      hash_cell = Hash(Symbol, String | Int32 | Float64 | Bool | Nil).new
+      hash_cell[:content] = "A"
+      hash_cell[:background_color] = "FF0000"
+
+      table = PDF::Table.new(
+        data: [[hash_cell.as(PDF::Table::CellData), "B".as(PDF::Table::CellData)]],
+        column_widths: [100.0, 100.0],
+        row_colors: ["EEEEEE"],
+      )
+
+      table.cells[0][0].background_color.should eq("FF0000")
+      table.cells[0][1].background_color.should eq("EEEEEE")
+    end
+  end
+
+  describe "Page#table pagination" do
+    it "flows overflowing rows onto new pages and repeats the header" do
+      doc = PDF::Document.new
+      doc.page(612, 792) do |page|
+        page.font("Helvetica", size: 10)
+        data = [["Header 1", "Header 2"]] + Array.new(60) { |i| ["Row #{i} A", "Row #{i} B"] }
+        page.table(
+          data,
+          at: {50, 700},
+          column_widths: [200.0, 200.0],
+          header: true,
+        )
+      end
+
+      doc.pages.size.should be > 1
+
+      io = IO::Memory.new
+      doc.write(io)
+      io.size.should be > 0
+    end
   end
 end
