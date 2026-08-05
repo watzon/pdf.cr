@@ -25,6 +25,13 @@ module PDF
     # Content operations buffer
     @content : IO::Memory
 
+    # Returns the raw content stream operators accumulated so far
+    # (uncompressed). Mainly useful for asserting on emitted operators
+    # in specs.
+    def content_string : String
+      @content.to_s
+    end
+
     # Current font name and size
     @current_font : String?
     @current_font_size : Float64 = 12.0

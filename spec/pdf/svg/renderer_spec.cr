@@ -179,6 +179,18 @@ describe PDF::SVG::Renderer do
       io.size.should be > 0
     end
 
+    it "applies a transform set directly on a shape, not just on <g>" do
+      doc = PDF::Document.new
+      doc.page do |page|
+        page.font("Helvetica", size: 10)
+        svg = %(<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+          <rect transform="translate(20, 30)" x="0" y="0" width="10" height="10" fill="orange"/>
+        </svg>)
+        page.svg(svg, at: {50, 700})
+        page.content_string.should contain("1 0 0 1 70 670 cm")
+      end
+    end
+
     it "renders an SVG with text" do
       doc = PDF::Document.new
       doc.page do |page|
