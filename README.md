@@ -150,7 +150,7 @@ remaining = page.formatted_text_box(
 )
 ```
 
-A string argument is parsed as inline markup, as in Prawn. The tags are `<b>`, `<strong>`, `<i>`, `<em>`, `<u>`, `<strikethrough>`, `<sub>`, `<sup>`, `<color rgb="FF0000">`, `<font name="Courier" size="10">` and `<br>`. Use `&lt;`, `&gt;` and `&amp;` for `<`, `>` and `&`. `PDF::Text::Formatted::Parser.format` returns the fragments.
+A string argument is parsed as inline markup, as in Prawn. The tags are `<b>`, `<strong>`, `<i>`, `<em>`, `<u>`, `<strikethrough>`, `<sub>`, `<sup>`, `<color rgb="FF0000">`, `<font name="Courier" size="10">` and `<br>`. A font size must be a positive number. Use `&lt;`, `&gt;` and `&amp;` for `<`, `>` and `&`. `PDF::Text::Formatted::Parser.format` returns the fragments.
 
 ```crystal
 page.formatted_text_box(%(Plain, <b>bold</b>, <color rgb="0000FF">blue</color>), at: {72, 720}, width: 400)

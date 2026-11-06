@@ -60,6 +60,31 @@ describe PDF::Text::Formatted::Parser do
     expect_raises(ArgumentError, /font size/) { parse(%(<font size="big">x</font>)) }
   end
 
+  it "raises for a font size that is not positive and finite" do
+    # nan wrote "/F1 nan Tf" to the content stream, which is not valid PDF.
+    ["nan", "inf", "-inf", "0", "-5", "1e309"].each do |size|
+      expect_raises(ArgumentError, /font size/) { parse(%(<font size="#{size}">x</font>)) }
+    end
+  end
+
+  it "parses tags between multibyte characters" do
+    fragments = parse("ü<b>é</b>ö " * 3)
+    fragments.map(&.[:text].as(String)).join.should eq("üéö " * 3)
+    fragments[1][:text].should eq("é")
+    fragments[1][:styles].should eq([:bold])
+  end
+
+  it "parses long non-ASCII markup completely" do
+    fragments = parse("ü <b>é</b> " * 20_000)
+    fragments.size.should eq(40_001)
+    fragments.last[:text].should eq(" ")
+  end
+
+  it "raises for markup that is not valid UTF-8" do
+    invalid = String.new(Bytes[0x61, 0xff, 0x3c, 0x62, 0x3e, 0x62])
+    expect_raises(ArgumentError) { parse(invalid) }
+  end
+
   it "converts <br> and <br/> to newlines" do
     texts("a<br>b<br/>c").should eq(["a\nb\nc"])
   end
