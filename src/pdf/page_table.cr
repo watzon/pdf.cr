@@ -14,6 +14,40 @@ module PDF
     # )
     # ```
     def table(
+      data : Array(Array(T)),
+      *,
+      at : Tuple(Number, Number) = {0, 0},
+      header : Bool | Int32 = false,
+      column_widths : Array(Float64)? = nil,
+      table_width : Float64? = nil,
+      cell_style : Hash(Symbol, String | Float64 | Bool | Nil)? = nil,
+      row_colors : Array(String)? = nil,
+    ) : Table forall T
+      rows = data.map do |row|
+        row.map { |cell| normalize_table_cell(cell).as(Table::CellData) }
+      end
+      table(rows, at: at, header: header, column_widths: column_widths,
+        table_width: table_width, cell_style: cell_style, row_colors: row_colors)
+    end
+
+    private def normalize_table_cell(cell : String) : Table::CellData
+      cell
+    end
+
+    private def normalize_table_cell(cell : Hash | NamedTuple) : Table::CellData
+      hash = {} of Symbol => String | Int32 | Float64 | Bool | Nil
+      cell.each do |key, value|
+        hash[key] = case value
+                           when Int then value.to_i32
+                           when Float then value.to_f64
+                           when String, Bool, Nil then value
+                           else value.to_s
+                           end
+      end
+      hash
+    end
+
+    def table(
       data : Array(Array(Table::CellData)),
       *,
       at : Tuple(Number, Number) = {0, 0},

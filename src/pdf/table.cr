@@ -73,6 +73,10 @@ module PDF
 
       # Set column widths
       if column_widths
+        if column_widths.size != @column_count
+          raise ArgumentError.new(
+            "column_widths has #{column_widths.size} entries but the table has #{@column_count} columns")
+        end
         @column_widths = column_widths
       else
         @column_widths = calculate_column_widths
@@ -116,38 +120,35 @@ module PDF
       current_page = page
       current_y = y
       remaining_height = available_height
+      # True right after a page break, until a body row is drawn. A group
+      # that does not fit on a fresh page is drawn anyway (avoids a loop).
+      fresh_page = false
 
-      @cells.each_with_index do |row, row_idx|
-        row_height = @row_heights[row_idx]
+      row_groups.each do |group|
+        group_height = group.sum { |r| @row_heights[r] }
 
-        # Check if we need a new page
-        if row_height > remaining_height && row_idx > 0
-          # Start new page
+        if group_height > remaining_height && !fresh_page
           current_page, current_y = block.call
           remaining_height = current_y - 50.0 # margin
+          fresh_page = true
 
-          # Redraw header rows on new page
-          if @header > 0
+          # Redraw header rows on new page (unless the header itself is
+          # being drawn now)
+          if @header > 0 && group.begin >= @header
             (0...@header).each do |header_row_idx|
-              position_row(header_row_idx, x, current_y)
-              @cells[header_row_idx].each do |cell|
-                next if cell.span_dummy?
-                draw_cell(current_page, cell)
-              end
+              draw_row(current_page, header_row_idx, x, current_y)
               current_y -= @row_heights[header_row_idx]
               remaining_height -= @row_heights[header_row_idx]
             end
           end
         end
 
-        # Position and draw this row
-        position_row(row_idx, x, current_y)
-        row.each do |cell|
-          next if cell.span_dummy?
-          draw_cell(current_page, cell)
+        group.each do |r|
+          draw_row(current_page, r, x, current_y)
+          current_y -= @row_heights[r]
+          remaining_height -= @row_heights[r]
         end
-        current_y -= row_height
-        remaining_height -= row_height
+        fresh_page = false
       end
 
       {current_page, current_y}
@@ -161,6 +162,35 @@ module PDF
     # Returns the total width of the table.
     def total_width : Float64
       @column_widths.sum
+    end
+
+    private def draw_row(page : Page, row_idx : Int32, x : Float64, y : Float64) : Nil
+      position_row(row_idx, x, y)
+      @cells[row_idx].each do |cell|
+        next if cell.span_dummy?
+        draw_cell(page, cell)
+      end
+    end
+
+    # Groups of row indices that must stay on the same page (rows linked
+    # by rowspan cells).
+    private def row_groups : Array(Range(Int32, Int32))
+      groups = [] of Range(Int32, Int32)
+      i = 0
+      while i < @row_count
+        last = i
+        j = i
+        while j <= last
+          @cells[j].each do |cell|
+            next if cell.span_dummy?
+            last = Math.max(last, Math.min(j + cell.rowspan - 1, @row_count - 1))
+          end
+          j += 1
+        end
+        groups << (i..last)
+        i = last + 1
+      end
+      groups
     end
 
     private def build_cells(data : Array(Array(CellData))) : Array(Array(Cell))
@@ -275,8 +305,7 @@ module PDF
             next if cell.span_dummy?
             next if col_idx >= @column_count
 
-            # Approximate width: character count * font_size * 0.6 + padding
-            content_width = cell.content.size.to_f * cell.font_size * 0.5
+            content_width = cell.natural_content_width
             cell_width = content_width + cell.padding_left + cell.padding_right
 
             if cell.colspan == 1
@@ -439,36 +468,25 @@ module PDF
         end
       end
 
-      # Draw text content
+      # Draw text content, one line per baseline
       unless cell.content.empty?
-        font_name = cell.font_name
-        if cell.bold
-          font_name = "#{font_name}-Bold"
-        end
-        if cell.italic
-          font_name = font_name.gsub("-Bold", "-BoldOblique")
-          font_name = "#{font_name}-Oblique" unless font_name.includes?("Oblique")
-        end
-
         page.fill_color(cell.text_color)
-        page.font(font_name, size: cell.font_size)
+        page.font(cell.effective_font_name, size: cell.font_size)
 
-        text_x = x + cell.padding_left
-        text_y = y - cell.padding_top - cell.font_size
+        cell.lines.each_with_index do |line, i|
+          next if line.empty?
+          text_x = x + cell.padding_left
+          text_y = y - cell.padding_top - cell.font_size - (i * cell.font_size * 1.2)
 
-        # Handle alignment
-        case cell.align
-        when :center
-          text_width = cell.content.size.to_f * cell.font_size * 0.5
-          available = cell.content_width
-          text_x = x + cell.padding_left + (available - text_width) / 2.0
-        when :right
-          text_width = cell.content.size.to_f * cell.font_size * 0.5
-          available = cell.content_width
-          text_x = x + cell.padding_left + available - text_width
+          case cell.align
+          when :center
+            text_x += (cell.content_width - cell.text_width(line)) / 2.0
+          when :right
+            text_x += cell.content_width - cell.text_width(line)
+          end
+
+          page.text(line, at: {text_x, text_y})
         end
-
-        page.text(cell.content, at: {text_x, text_y})
       end
 
       # Reset fill color to black

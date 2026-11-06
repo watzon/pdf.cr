@@ -287,4 +287,127 @@ describe PDF::Table do
       io.size.should be > 0
     end
   end
+
+  describe "regressions (PR #7 review)" do
+    it "accepts the documented Page#table literal" do
+      doc = PDF::Document.new
+      doc.page do |page|
+        page.font("Helvetica", size: 10)
+        # The documented literal overload-resolves and normalizes. Its second
+        # row spans 3 columns, so 2 widths are rejected by validation.
+        expect_raises(ArgumentError, /3 columns/) do
+          page.table(
+            [["Header 1", "Header 2"], ["Cell 1", {content: "Cell 2", colspan: 2}]],
+            at: {50, 700}, header: true, column_widths: [100.0, 200.0],
+          )
+        end
+        table = page.table(
+          [["Header 1", "Header 2"], ["Cell 1", {content: "Cell 2", colspan: 2}]],
+          at: {50, 700}, header: true, column_widths: [100.0, 100.0, 100.0],
+        )
+        table.row_count.should eq(2)
+      end
+    end
+
+    it "accepts a plain string-array table" do
+      doc = PDF::Document.new
+      doc.page do |page|
+        page.table([["a", "b"]], at: {50, 700}).row_count.should eq(1)
+      end
+    end
+
+    it "draws bold and italic Times and Courier cells" do
+      doc = PDF::Document.new
+      doc.page do |page|
+        %w[Helvetica Times-Roman Courier].each do |family|
+          t = page.table([[{content: "x", font_name: family, bold: true, italic: true}]], at: {50, 700})
+          t.cells[0][0].effective_font_name.should_not contain("Roman-")
+        end
+      end
+      PDF::Table::Cell.new("x").tap { |c| c.font_name = "Times-Roman"; c.bold = true }.effective_font_name.should eq("Times-Bold")
+      PDF::Table::Cell.new("x").tap { |c| c.font_name = "Times-Roman"; c.italic = true }.effective_font_name.should eq("Times-Italic")
+      PDF::Table::Cell.new("x").tap { |c| c.font_name = "Courier"; c.bold = true; c.italic = true }.effective_font_name.should eq("Courier-BoldOblique")
+      PDF::Table::Cell.new("x").tap { |c| c.bold = true }.effective_font_name.should eq("Helvetica-Bold")
+      PDF::Table::Cell.new("x").tap { |c| c.italic = true }.effective_font_name.should eq("Helvetica-Oblique")
+    end
+
+    it "draws each line of multi-line content separately" do
+      doc = PDF::Document.new
+      doc.page do |page|
+        page.table([["one\ntwo"]], at: {50, 700})
+        s = page.content_string
+        s.should contain("(one) Tj")
+        s.should contain("(two) Tj")
+        s.should_not contain("one\ntwo")
+      end
+    end
+
+    it "right-aligns text using real font metrics" do
+      doc = PDF::Document.new
+      doc.page do |page|
+        table = PDF::Table.new(data: [["WWWW"] of PDF::Table::CellData], column_widths: [200.0])
+        table.cells[0][0].align = :right
+        page.font("Helvetica", size: 10)
+        table.draw(page, x: 50.0, y: 700.0)
+        cell = table.cells[0][0]
+        text_x = page.content_string.match(/([\d.]+) [\d.]+ Td\n\(WWWW\)/).not_nil![1].to_f
+        (text_x + cell.text_width("WWWW")).should be_close(250.0 - cell.padding_right, 0.5)
+      end
+    end
+
+    it "raises when column_widths size differs from the column count" do
+      expect_raises(ArgumentError, /column_widths/) do
+        PDF::Table.new(data: [["a", "b", "c"] of PDF::Table::CellData], column_widths: [50.0, 50.0])
+      end
+    end
+
+    it "breaks before the first row when it does not fit" do
+      doc = PDF::Document.new
+      doc.page do |page|
+        page.font("Helvetica", size: 10)
+        breaks = 0
+        table = PDF::Table.new(data: [["a"] of PDF::Table::CellData], column_widths: [100.0])
+        table.draw_with_page_breaks(page, x: 50.0, y: 60.0, available_height: 10.0) do
+          breaks += 1
+          {doc.page { }, 700.0}
+        end
+        breaks.should eq(1)
+      end
+    end
+
+    it "draws a row taller than a page without looping" do
+      doc = PDF::Document.new
+      doc.page do |page|
+        page.font("Helvetica", size: 10)
+        breaks = 0
+        table = PDF::Table.new(data: [["a"] of PDF::Table::CellData], column_widths: [100.0])
+        table.draw_with_page_breaks(page, x: 50.0, y: 60.0, available_height: 1.0) do
+          breaks += 1
+          {doc.page { }, 5.0}
+        end
+        breaks.should eq(1)
+      end
+    end
+
+    it "keeps rowspan groups on one page" do
+      doc = PDF::Document.new
+      doc.page do |page|
+        page.font("Helvetica", size: 10)
+        data = [
+          [({:content => "span", :rowspan => 2} of Symbol => String | Int32 | Float64 | Bool | Nil), "b"] of PDF::Table::CellData,
+          ["c"] of PDF::Table::CellData,
+        ]
+        table = PDF::Table.new(data: data, column_widths: [100.0, 100.0])
+        h = table.row_heights
+        breaks = 0
+        # Room for the first row only: the group must move as a whole.
+        table.draw_with_page_breaks(page, x: 50.0, y: 700.0, available_height: h[0] + 1.0) do
+          breaks += 1
+          {doc.page { }, 700.0}
+        end
+        breaks.should eq(1)
+        table.cells[0][0].y.should eq(700.0)
+      end
+    end
+  end
 end

@@ -107,4 +107,15 @@ describe PDF::Table::Cell do
       cell.content_height.should eq(40.0) # 50 - 5 - 5
     end
   end
+
+  describe "numeric option coercion" do
+    it "accepts Int for Float options and Float for Int options" do
+      cell = PDF::Table::Cell.make({:content => "x", :font_size => 12, :border_width => 2, :padding => 3, :colspan => 2.0, :rowspan => 3.0} of Symbol => String | Int32 | Float64 | Bool | Nil)
+      cell.font_size.should eq(12.0)
+      cell.border_width.should eq(2.0)
+      cell.padding.should eq([3.0, 3.0, 3.0, 3.0])
+      cell.colspan.should eq(2)
+      cell.rowspan.should eq(3)
+    end
+  end
 end

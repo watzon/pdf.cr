@@ -1,10 +1,19 @@
 module PDF
   class Table
+    # Exposes FontMeasurer's standard-14 bold/italic name mapping.
+    class StyleResolver < Text::Formatted::FontMeasurer
+      def resolve(base_name : String, styles : Array(Symbol)) : String
+        resolve_font_name(base_name, styles)
+      end
+    end
+
     # Represents a single cell in a table. A cell has content, position,
     # dimensions, padding, borders, and optional span.
     #
     # Ported from Prawn::Table::Cell.
     class Cell
+      @@measure_document = Document.new
+
       # Cell content (text string)
       property content : String
 
@@ -88,35 +97,66 @@ module PDF
           content
         when Hash
           cell = Cell.new(content[:content]?.try(&.to_s) || "")
-          if colspan = content[:colspan]?
-            cell.colspan = colspan.as(Int32)
+          if colspan = to_int(content[:colspan]?)
+            cell.colspan = colspan
           end
-          if rowspan = content[:rowspan]?
-            cell.rowspan = rowspan.as(Int32)
+          if rowspan = to_int(content[:rowspan]?)
+            cell.rowspan = rowspan
           end
           if bg = content[:background_color]?
-            cell.background_color = bg.as(String)
+            cell.background_color = bg.to_s
           end
           if tc = content[:text_color]?
-            cell.text_color = tc.as(String)
+            cell.text_color = tc.to_s
+          end
+          if bc = content[:border_color]?
+            cell.border_color = bc.to_s
           end
           if fn = content[:font_name]?
-            cell.font_name = fn.as(String)
+            cell.font_name = fn.to_s
           end
-          if fs = content[:font_size]?
-            cell.font_size = fs.as(Float64)
+          if fs = to_float(content[:font_size]?)
+            cell.font_size = fs
           end
-          # Note: align must be set separately as it's a Symbol
-          # and the hash value type doesn't include Symbol
+          if bw = to_float(content[:border_width]?)
+            cell.border_width = bw
+          end
+          if pad = to_float(content[:padding]?)
+            cell.padding = [pad, pad, pad, pad]
+          end
+          if al = content[:align]?
+            case al.to_s
+            when "center" then cell.align = :center
+            when "right"  then cell.align = :right
+            when "left"   then cell.align = :left
+            end
+          end
           if b = content[:bold]?
-            cell.bold = b.as(Bool)
+            cell.bold = b == true
           end
           if i = content[:italic]?
-            cell.italic = i.as(Bool)
+            cell.italic = i == true
           end
           cell
         else
           Cell.new(content.to_s)
+        end
+      end
+
+      # Coerces a numeric-like option value to Float64 (nil if not numeric).
+      private def self.to_float(value) : Float64?
+        case value
+        when Int32, Float64 then value.to_f
+        when String         then value.to_f?
+        end
+      end
+
+      # Coerces a numeric-like option value to Int32 (nil if not numeric).
+      private def self.to_int(value) : Int32?
+        case value
+        when Int32   then value
+        when Float64 then value.to_i
+        when String  then value.to_i?
         end
       end
 
@@ -130,24 +170,35 @@ module PDF
         @height - padding_top - padding_bottom
       end
 
-      # Natural content width based on text measurement.
-      def natural_content_width(font_metrics : Proc(String, String, Float64, Float64)) : Float64
-        effective_font = @font_name
-        if @bold && @italic
-          effective_font = "#{@font_name}-BoldOblique"
-        elsif @bold
-          effective_font = "#{@font_name}-Bold"
-        elsif @italic
-          effective_font = "#{@font_name}-Oblique"
-        end
-        font_metrics.call(@content, effective_font, @font_size)
+      # Font name with bold/italic applied (standard-14 variants).
+      def effective_font_name : String
+        styles = [] of Symbol
+        styles << :bold if @bold
+        styles << :italic if @italic
+        return @font_name if styles.empty?
+        StyleResolver.new(@@measure_document).resolve(@font_name, styles)
+      end
+
+      # Width of a text string in this cell's font, using real font metrics.
+      def text_width(text : String) : Float64
+        return 0.0 if text.empty?
+        @@measure_document.font(effective_font_name).string_width(text, @font_size)
+      end
+
+      # Natural content width: the widest line of the content.
+      def natural_content_width : Float64
+        lines.max_of? { |line| text_width(line) } || 0.0
+      end
+
+      # Content split into lines.
+      def lines : Array(String)
+        @content.split('\n', remove_empty: false)
       end
 
       # Natural height based on content and font size.
       def natural_height : Float64
         # Approximate: one line of text plus padding
-        lines = @content.count('\n') + 1
-        (lines * @font_size * 1.2) + padding_top + padding_bottom
+        (lines.size * @font_size * 1.2) + padding_top + padding_bottom
       end
 
       # Padding accessors
