@@ -183,6 +183,49 @@ describe "PDF::Page box flow" do
         end
       end
     end
+
+    it "starts a span on a new page when the columns are full" do
+      doc = PDF::Document.new
+      doc.page do |page|
+        page.column_box(at: {50, 500}, width: 400, height: 30, columns: 2) do |col|
+          4.times { col.text("line").should be_true } # 2 lines per column
+          span = col.span(&.text("title").should(be_true))
+          span.absolute_top.should eq(500.0)
+          span.height.should be_close(14.4, 1e-9)
+          col.page.should be(doc.pages.last)
+          col.text("below").should be_true
+        end
+      end
+      doc.pages.size.should eq(2)
+      doc.pages[0].content_string.should_not contain("(title)")
+      flow_tds(doc.pages[1]).should eq([{50.0, 500.0 - 12 * ASCENT}, {50.0, 500.0 - 14.4 - 12 * ASCENT}])
+      doc.pages[1].content_string.should contain("(title)")
+    end
+
+    it "starts a span with formatted text on a new page when its first line does not fit" do
+      doc = PDF::Document.new
+      doc.page do |page|
+        page.column_box(at: {50, 500}, width: 400, height: 20, columns: 1) do |col|
+          col.text("line").should be_true # 5.6 points stay below the line
+          col.span(&.formatted_text(flow_frag("title")).should(be_empty))
+        end
+      end
+      doc.pages.size.should eq(2)
+      doc.pages[1].content_string.should contain("(title)")
+    end
+
+    it "truncates a span that does not fit when page_break is off" do
+      doc = PDF::Document.new
+      doc.page do |page|
+        page.column_box(at: {50, 500}, width: 400, height: 30, columns: 2, page_break: false) do |col|
+          4.times { col.text("line") }
+          span = col.span(&.text("title").should(be_false))
+          span.height.should eq(0.0)
+        end
+      end
+      doc.pages.size.should eq(1)
+      doc.pages[0].content_string.should_not contain("(title)")
+    end
   end
 
   describe "column box page breaks" do

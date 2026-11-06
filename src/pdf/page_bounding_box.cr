@@ -86,11 +86,17 @@ module PDF
         @clips = [] of Layout::BoundingBox
       end
 
-      def run_bounding_box(box : Layout::BoundingBox, overflow : Symbol, &block : BoundingBoxContext ->) : Nil
+      # `relocate` is given to the `BoundingBoxContext` (see there).
+      def run_bounding_box(
+        box : Layout::BoundingBox,
+        overflow : Symbol,
+        relocate : (-> Layout::BoundingBox?)? = nil,
+        &block : BoundingBoxContext ->
+      ) : Nil
         unless BOUNDING_BOX_OVERFLOWS.includes?(overflow)
           raise ArgumentError.new("Unknown overflow: #{overflow}. Use :truncate, :clip or :visible.")
         end
-        ctx = BoundingBoxContext.new(self, box, overflow)
+        ctx = BoundingBoxContext.new(self, box, overflow, relocate)
         if overflow == :clip
           raise ArgumentError.new("overflow: :clip needs a fixed height.") if box.stretchy?
           with_clip(box) { block.call(ctx) }
@@ -280,7 +286,15 @@ module PDF
         initialize(LayoutFlow.new(page), box, overflow)
       end
 
-      def initialize(@flow : LayoutFlow, @box : Layout::BoundingBox, @overflow : Symbol)
+      # `relocate` runs when content does not fit while the box is still
+      # empty. It returns a box at a place with more room (for a column box
+      # span, the top of the box on a new page), or nil. It runs one time.
+      def initialize(
+        @flow : LayoutFlow,
+        @box : Layout::BoundingBox,
+        @overflow : Symbol,
+        @relocate : (-> Layout::BoundingBox?)? = nil,
+      )
       end
 
       # Draws a line of text at the current cursor position within the box
@@ -290,7 +304,9 @@ module PDF
       # `:truncate` and the line does not fit above the bottom of the box.
       def text(content : String, *, font_name : String = "Helvetica", font_size : Number = 12, align : Symbol = :left) : Bool
         line_height = font_size.to_f * 1.2
-        return false if @overflow == :truncate && !line_fits?(line_height)
+        if @overflow == :truncate && !line_fits?(line_height)
+          return false unless relocate && line_fits?(line_height)
+        end
         draw_line(content, font_name, font_size.to_f, @box.left_side)
         @box.move_down(line_height)
         true
@@ -310,20 +326,35 @@ module PDF
         font_name : String = "Helvetica",
         font_size : Number = 12,
       ) : Array(Text::Formatted::FragmentHash)
-        box = Text::Formatted::Box.new(
-          formatted_text: fragments,
-          at: {@box.left_side, @box.absolute_cursor_y},
-          width: @box.width,
-          height: @box.available_height,
-          align: align,
-          leading: leading.to_f,
-          document: page.document,
-          font_name: font_name,
-          font_size: font_size.to_f,
-        )
-        remaining = box.render(page)
-        @box.move_down(box.rendered_height)
-        remaining
+        loop do
+          box = Text::Formatted::Box.new(
+            formatted_text: fragments,
+            at: {@box.left_side, @box.absolute_cursor_y},
+            width: @box.width,
+            height: @box.available_height,
+            align: align,
+            leading: leading.to_f,
+            document: page.document,
+            font_name: font_name,
+            font_size: font_size.to_f,
+          )
+          remaining = box.render(page)
+          next if box.nothing_printed? && !remaining.empty? && relocate
+          @box.move_down(box.rendered_height)
+          return remaining
+        end
+      end
+
+      # Moves an empty box to the place that `@relocate` gives. Returns
+      # `false` when the box has content or no other place is available.
+      private def relocate : Bool
+        hook = @relocate
+        return false unless hook && @box.height <= FIT_EPSILON
+        @relocate = nil
+        moved = hook.call
+        return false unless moved
+        @box = moved
+        true
       end
 
       # Draws the outline of the bounding box (useful for debugging).
@@ -442,6 +473,11 @@ module PDF
       # columns. After the span, a new section of columns starts below it,
       # beginning with the first column.
       #
+      # When the first line of the span does not fit the rest of the box,
+      # the span starts at the top of the box on a new page (only with
+      # `page_break`, and when content is on the current page). Content that
+      # does not fit after that is truncated, as in a stretchy bounding box.
+      #
       # `position` is `:left`, `:center` or `:right` when `width` is less
       # than the box width.
       #
@@ -458,13 +494,17 @@ module PDF
                    raise ArgumentError.new("Unknown span position: #{position}. Use :left, :center or :right.")
                  end
         top = @box.section_bottom
-        child = Layout::BoundingBox.new(
-          x: @box.absolute_left + offset,
-          y: @box.absolute_top - top,
-          box_width: span_width,
-          parent: @box,
-        )
-        @flow.run_bounding_box(child, :truncate, &block)
+        child = span_box(top, offset, span_width)
+        # When the span content does not fit the rest of the box, the span
+        # starts at the top of the box on a new page, as other content does.
+        relocate = -> : Layout::BoundingBox? {
+          if @page_break && @placed_on_page
+            break_page
+            top = @box.section_bottom
+            child = span_box(top, offset, span_width)
+          end
+        }
+        @flow.run_bounding_box(child, :truncate, relocate, &block)
         @box.start_section(top + child.height)
         @placed_on_page = true if child.height > 0
         child
@@ -500,17 +540,31 @@ module PDF
         @placed_on_page = true
       end
 
+      private def span_box(top : Float64, offset : Float64, span_width : Float64) : Layout::BoundingBox
+        Layout::BoundingBox.new(
+          x: @box.absolute_left + offset,
+          y: @box.absolute_top - top,
+          box_width: span_width,
+          parent: @box,
+        )
+      end
+
       # Moves to the next column, or to a new page after the last column.
       # Returns `false` when the box is full and no page break is possible.
       private def next_column : Bool
         return true unless @box.advance_column
         return false unless @page_break && @placed_on_page
 
+        break_page
+        true
+      end
+
+      # Continues the box on a new page and runs the page break hooks.
+      private def break_page : Nil
         @flow.start_new_page
         @box.start_new_page
         @placed_on_page = false
         @page_break_hooks.each(&.call(self))
-        true
       end
     end
   end
