@@ -3,7 +3,6 @@ require "../../../spec_helper"
 TRUETYPE_SUBSETTER_SPEC_FONT_PATH = "spec/fixtures/fonts/DejaVuSans.ttf"
 
 describe PDF::Fonts::TrueType::Subsetter do
-
   describe "#subset" do
     it "creates a subset font with used characters" do
       parser = PDF::Fonts::TrueType::Parser.parse(TRUETYPE_SUBSETTER_SPEC_FONT_PATH)
@@ -67,7 +66,7 @@ describe PDF::Fonts::TrueType::Subsetter do
       subsetter.subset
 
       mapping = subsetter.unicode_to_glyph_map
-      glyph_ids = mapping.values.sort
+      glyph_ids = mapping.values.sort!
 
       # IDs should be low numbers (starting after .notdef at 0)
       glyph_ids.each do |id|

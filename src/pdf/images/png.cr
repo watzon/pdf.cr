@@ -12,9 +12,9 @@ module PDF
     #
     # ```
     # png = PDF::Images::PNG.load("logo.png")
-    # png.width       # => 200
-    # png.height      # => 100
-    # png.has_alpha?  # => true
+    # png.width      # => 200
+    # png.height     # => 100
+    # png.has_alpha? # => true
     # ```
     class PNG < Base
       # Decoded RGB pixel data (no alpha)
@@ -28,7 +28,7 @@ module PDF
       getter height : Int32
 
       # Whether this PNG has meaningful transparency
-      getter has_alpha : Bool
+      getter? has_alpha : Bool
 
       def initialize(@rgb_data : Bytes, @alpha_data : Bytes?, @width : Int32, @height : Int32, @has_alpha : Bool)
       end
@@ -99,10 +99,6 @@ module PDF
         Objects::Name.new("DeviceRGB")
       end
 
-      def has_alpha? : Bool
-        @has_alpha
-      end
-
       # Create the main image stream (RGB data only)
       def to_stream : Objects::Stream
         stream = Objects::Stream.new
@@ -127,10 +123,10 @@ module PDF
 
       # Create the soft mask stream for transparency
       def soft_mask_stream : Objects::Stream?
-        return nil unless @has_alpha
+        return unless @has_alpha
 
         alpha = @alpha_data
-        return nil unless alpha
+        return unless alpha
 
         stream = Objects::Stream.new
         stream.data = alpha

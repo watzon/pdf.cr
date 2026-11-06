@@ -31,7 +31,7 @@ module PDF
 
         # Add a string of characters to the subset
         def use(text : String) : Nil
-          text.each_char { |c| use(c) }
+          text.each_char { |char| use(char) }
         end
 
         # Get the new glyph ID for an old glyph ID
@@ -80,7 +80,7 @@ module PDF
             original_ids = @glyph_ids.dup
             original_ids.each do |glyph_id|
               components = @parser.glyf.component_glyph_ids(glyph_id, @parser.loca)
-              components.each { |c| @glyph_ids << c }
+              components.each { |component_id| @glyph_ids << component_id }
             end
           end
         end
@@ -173,7 +173,8 @@ module PDF
           tables << {"post", build_post}
 
           if @parser.has_table?("OS/2")
-            tables << {"OS/2", @parser.os2.not_nil!.to_bytes}
+            os2 = @parser.os2 || raise "OS/2 table is present but could not be read"
+            tables << {"OS/2", os2.to_bytes}
           end
 
           # Sort tables by tag (required for proper checksums)
@@ -188,7 +189,7 @@ module PDF
         end
 
         private def build_glyf : Tuple(Tables::Glyf, Tables::Loca)
-          sorted_ids = @glyph_id_map.keys.sort_by { |id| @glyph_id_map[id] }
+          sorted_ids = @glyph_id_map.keys.sort_by! { |id| @glyph_id_map[id] }
           @parser.glyf.subset(sorted_ids, @parser.loca, @glyph_id_map)
         end
 
@@ -261,23 +262,31 @@ module PDF
           write_uint32(io, maxp.version)
           write_uint16(io, @glyph_id_map.size.to_u16)
 
-          if maxp.truetype?
-            write_uint16(io, maxp.max_points || 0_u16)
-            write_uint16(io, maxp.max_contours || 0_u16)
-            write_uint16(io, maxp.max_composite_points || 0_u16)
-            write_uint16(io, maxp.max_composite_contours || 0_u16)
-            write_uint16(io, maxp.max_zones || 2_u16)
-            write_uint16(io, maxp.max_twilight_points || 0_u16)
-            write_uint16(io, maxp.max_storage || 0_u16)
-            write_uint16(io, maxp.max_function_defs || 0_u16)
-            write_uint16(io, maxp.max_instruction_defs || 0_u16)
-            write_uint16(io, maxp.max_stack_elements || 0_u16)
-            write_uint16(io, maxp.max_size_of_instructions || 0_u16)
-            write_uint16(io, maxp.max_component_elements || 0_u16)
-            write_uint16(io, maxp.max_component_depth || 0_u16)
-          end
+          write_maxp_truetype_limits(io, maxp) if maxp.truetype?
 
           io.to_slice
+        end
+
+        private def write_maxp_truetype_limits(io : IO, maxp : Tables::Maxp) : Nil
+          [
+            maxp.max_points,
+            maxp.max_contours,
+            maxp.max_composite_points,
+            maxp.max_composite_contours,
+          ].each { |limit| write_uint16(io, limit || 0_u16) }
+
+          write_uint16(io, maxp.max_zones || 2_u16)
+
+          [
+            maxp.max_twilight_points,
+            maxp.max_storage,
+            maxp.max_function_defs,
+            maxp.max_instruction_defs,
+            maxp.max_stack_elements,
+            maxp.max_size_of_instructions,
+            maxp.max_component_elements,
+            maxp.max_component_depth,
+          ].each { |limit| write_uint16(io, limit || 0_u16) }
         end
 
         private def build_post : Bytes

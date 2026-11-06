@@ -49,25 +49,8 @@ module PDF
         Luminosity
 
         def to_pdf_name : String
-          case self
-          when Normal     then "Normal"
-          when Multiply   then "Multiply"
-          when Screen     then "Screen"
-          when Overlay    then "Overlay"
-          when Darken     then "Darken"
-          when Lighten    then "Lighten"
-          when ColorDodge then "ColorDodge"
-          when ColorBurn  then "ColorBurn"
-          when HardLight  then "HardLight"
-          when SoftLight  then "SoftLight"
-          when Difference then "Difference"
-          when Exclusion  then "Exclusion"
-          when Hue        then "Hue"
-          when Saturation then "Saturation"
-          when Color      then "Color"
-          when Luminosity then "Luminosity"
-          else            raise "Unknown blend mode"
-          end
+          # Member names match the PDF blend mode names exactly.
+          to_s
         end
       end
 
@@ -84,7 +67,7 @@ module PDF
           when RelativeColorimetric then "RelativeColorimetric"
           when Saturation           then "Saturation"
           when Perceptual           then "Perceptual"
-          else                      raise "Unknown rendering intent"
+          else                           raise "Unknown rendering intent"
           end
         end
       end

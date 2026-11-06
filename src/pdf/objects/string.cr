@@ -41,7 +41,7 @@ module PDF
       # Creates a string with Unicode content (uses UTF-16BE with BOM)
       def self.unicode(text : ::String) : Str
         # Check if text contains non-ASCII characters
-        needs_unicode = text.each_char.any? { |c| c.ord > 127 }
+        needs_unicode = text.each_char.any? { |char| char.ord > 127 }
 
         if needs_unicode
           # Encode as UTF-16BE with BOM

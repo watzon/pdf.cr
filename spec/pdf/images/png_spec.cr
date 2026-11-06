@@ -73,10 +73,9 @@ describe PDF::Images::PNG do
 
     it "contains alpha data for RGBA PNG" do
       png = PDF::Images::PNG.load("spec/fixtures/images/test_rgba.png")
-      alpha = png.alpha_data
-      alpha.should_not be_nil
+      alpha = png.alpha_data || fail("expected alpha data for RGBA PNG")
       # 100x100 pixels * 1 byte (alpha) = 10000 bytes
-      alpha.not_nil!.size.should eq(100 * 100)
+      alpha.size.should eq(100 * 100)
     end
   end
 
@@ -113,10 +112,7 @@ describe PDF::Images::PNG do
 
     it "returns soft mask stream for RGBA PNG" do
       png = PDF::Images::PNG.load("spec/fixtures/images/test_rgba.png")
-      mask = png.soft_mask_stream
-      mask.should_not be_nil
-
-      mask = mask.not_nil!
+      mask = png.soft_mask_stream || fail("expected soft mask stream")
       mask["Type"].as(PDF::Objects::Name).value.should eq("XObject")
       mask["Subtype"].as(PDF::Objects::Name).value.should eq("Image")
       mask["Width"].as(PDF::Objects::Number).value.should eq(100)

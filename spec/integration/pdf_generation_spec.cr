@@ -106,7 +106,7 @@ describe "PDF Generation Integration" do
   describe "page sizes" do
     it "supports A4 size" do
       doc = PDF::Document.new
-      doc.page(size: :a4) { |p| p.font("Helvetica", size: 12) }
+      doc.page(size: :a4, &.font("Helvetica", size: 12))
 
       bytes = doc.to_slice
       content = String.new(bytes)
@@ -117,7 +117,7 @@ describe "PDF Generation Integration" do
 
     it "supports landscape orientation" do
       doc = PDF::Document.new
-      doc.page(size: :letter, orientation: :landscape) { |p| p.font("Helvetica", size: 12) }
+      doc.page(size: :letter, orientation: :landscape, &.font("Helvetica", size: 12))
 
       bytes = doc.to_slice
       content = String.new(bytes)

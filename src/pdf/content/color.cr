@@ -56,9 +56,9 @@ module PDF
       # Supports formats: "#RGB", "#RRGGBB", "RGB", "RRGGBB"
       #
       # ```
-      # PDF::Content::Color.from_hex("#FF0000")  # => {1.0, 0.0, 0.0}
-      # PDF::Content::Color.from_hex("00FF00")   # => {0.0, 1.0, 0.0}
-      # PDF::Content::Color.from_hex("#F00")     # => {1.0, 0.0, 0.0}
+      # PDF::Content::Color.from_hex("#FF0000") # => {1.0, 0.0, 0.0}
+      # PDF::Content::Color.from_hex("00FF00")  # => {0.0, 1.0, 0.0}
+      # PDF::Content::Color.from_hex("#F00")    # => {1.0, 0.0, 0.0}
       # ```
       def self.from_hex(hex : String) : Tuple(Float64, Float64, Float64)
         # Remove leading # if present

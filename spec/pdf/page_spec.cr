@@ -247,8 +247,8 @@ describe PDF::Page do
       doc.page do |page|
         result = page.line_cap(:round)
         result.should be(page)
-        result = page.line_cap(:butt)
-        result = page.line_cap(:square)
+        page.line_cap(:butt)
+        page.line_cap(:square)
       end
     end
 
@@ -274,8 +274,8 @@ describe PDF::Page do
       doc.page do |page|
         result = page.line_join(:round)
         result.should be(page)
-        result = page.line_join(:miter)
-        result = page.line_join(:bevel)
+        page.line_join(:miter)
+        page.line_join(:bevel)
       end
     end
 
@@ -545,13 +545,13 @@ describe PDF::Page do
       end
     end
 
-    it "supports set_graphics_state with ExtGState" do
+    it "supports apply_graphics_state with ExtGState" do
       doc = PDF::Document.new
       doc.page do |page|
         gs = PDF::Objects::ExtGState.new
         gs.fill_opacity = 0.5
         gs.blend_mode = PDF::Content::GraphicsState::BlendMode::Screen
-        result = page.set_graphics_state(gs)
+        result = page.apply_graphics_state(gs)
         result.should be(page)
       end
     end

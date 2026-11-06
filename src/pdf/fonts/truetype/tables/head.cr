@@ -79,7 +79,7 @@ module PDF
             @lowest_rec_ppem : UInt16,
             @font_direction_hint : Int16,
             @index_to_loc_format : Int16,
-            @glyph_data_format : Int16
+            @glyph_data_format : Int16,
           )
           end
 

@@ -46,7 +46,7 @@ module PDF
           def initialize(
             @version : UInt16,
             @encoding_records : Array(EncodingRecord),
-            @subtables : Hash(UInt32, Hash(UInt32, UInt16))
+            @subtables : Hash(UInt32, Hash(UInt32, UInt16)),
           )
             @unicode_subtable_offset = find_best_unicode_subtable
           end
@@ -97,9 +97,6 @@ module PDF
               parse_format6(io)
             when 12
               parse_format12(io)
-            else
-              # Unsupported format, skip
-              nil
             end
           end
 
@@ -118,7 +115,7 @@ module PDF
 
           # Format 4: Segment mapping to delta values (BMP Unicode)
           private def self.parse_format4(io : IO, raw_data : Bytes, table_offset : UInt32) : Hash(UInt32, UInt16)
-            length = read_uint16(io)
+            _length = read_uint16(io)
             _language = read_uint16(io)
             seg_count_x2 = read_uint16(io)
             seg_count = seg_count_x2 // 2
@@ -279,7 +276,7 @@ module PDF
             else
               # Merge all subtables
               result = Hash(UInt32, UInt16).new
-              @subtables.each_value { |m| result.merge!(m) }
+              @subtables.each_value { |table_map| result.merge!(table_map) }
               result
             end
           end
@@ -292,7 +289,7 @@ module PDF
             has_non_bmp = mapping.any? { |code, _| code > 0xFFFF }
 
             # Version and number of tables
-            write_uint16(io, 0_u16) # version
+            write_uint16(io, 0_u16)                       # version
             write_uint16(io, has_non_bmp ? 2_u16 : 1_u16) # numTables
 
             # Calculate offsets
@@ -301,17 +298,17 @@ module PDF
             format4_offset = header_size + (has_non_bmp ? 2 : 1) * encoding_record_size
 
             # Encoding record for format 4 (Windows Unicode BMP)
-            write_uint16(io, 3_u16)  # platformID
-            write_uint16(io, 1_u16)  # encodingID
+            write_uint16(io, 3_u16) # platformID
+            write_uint16(io, 1_u16) # encodingID
             write_uint32(io, format4_offset.to_u32)
 
             format12_offset_pos = 0
             if has_non_bmp
               # Placeholder for format 12 offset, we'll update it later
               format12_offset_pos = io.pos
-              write_uint16(io, 3_u16)   # platformID
-              write_uint16(io, 10_u16)  # encodingID
-              write_uint32(io, 0_u32)   # offset (placeholder)
+              write_uint16(io, 3_u16)  # platformID
+              write_uint16(io, 10_u16) # encodingID
+              write_uint32(io, 0_u32)  # offset (placeholder)
             end
 
             # Write format 4 subtable (BMP only)
@@ -343,7 +340,7 @@ module PDF
             range_shift = seg_count_x2 - search_range
 
             # Calculate length
-            glyph_id_array_size = segments.sum { |s| s[:glyph_ids].size * 2 }
+            glyph_id_array_size = segments.sum { |segment| segment[:glyph_ids].size * 2 }
             length = 16 + (seg_count * 8) + glyph_id_array_size
 
             write_uint16(io, 4_u16) # format
@@ -355,23 +352,23 @@ module PDF
             write_uint16(io, range_shift.to_u16)
 
             # End codes
-            segments.each { |s| write_uint16(io, s[:end_code].to_u16) }
+            segments.each { |segment| write_uint16(io, segment[:end_code].to_u16) }
             write_uint16(io, 0_u16) # reservedPad
 
             # Start codes
-            segments.each { |s| write_uint16(io, s[:start_code].to_u16) }
+            segments.each { |segment| write_uint16(io, segment[:start_code].to_u16) }
 
             # ID deltas (mod 65536 to handle overflow, then wrap to signed Int16)
-            segments.each do |s|
+            segments.each do |segment|
               # The delta is computed modulo 65536 since glyph IDs are 16-bit
-              delta_mod = s[:id_delta] & 0xFFFF
+              delta_mod = segment[:id_delta] & 0xFFFF
               write_int16(io, delta_mod.to_i16!)
             end
 
             # ID range offsets
             offset = segments.size * 2 # Offset from current position to glyphIdArray
-            segments.each_with_index do |s, i|
-              if s[:use_delta]
+            segments.each_with_index do |segment, i|
+              if segment[:use_delta]
                 write_uint16(io, 0_u16)
               else
                 # Calculate offset to this segment's glyph IDs
@@ -382,8 +379,8 @@ module PDF
             end
 
             # Glyph ID array
-            segments.each do |s|
-              s[:glyph_ids].each { |id| write_uint16(io, id) }
+            segments.each do |segment|
+              segment[:glyph_ids].each { |id| write_uint16(io, id) }
             end
           end
 
@@ -413,11 +410,11 @@ module PDF
                 # End current segment
                 id_delta = current_glyph_start - current_start.to_i32
                 segments << {
-                  start_code:  current_start,
-                  end_code:    current_end,
-                  id_delta:    id_delta,
-                  use_delta:   true,
-                  glyph_ids:   [] of UInt16,
+                  start_code: current_start,
+                  end_code:   current_end,
+                  id_delta:   id_delta,
+                  use_delta:  true,
+                  glyph_ids:  [] of UInt16,
                 }
 
                 # Start new segment
@@ -430,20 +427,20 @@ module PDF
             # Add final segment
             id_delta = current_glyph_start - current_start.to_i32
             segments << {
-              start_code:  current_start,
-              end_code:    current_end,
-              id_delta:    id_delta,
-              use_delta:   true,
-              glyph_ids:   [] of UInt16,
+              start_code: current_start,
+              end_code:   current_end,
+              id_delta:   id_delta,
+              use_delta:  true,
+              glyph_ids:  [] of UInt16,
             }
 
             # Add end marker
             segments << {
-              start_code:  0xFFFF_u32,
-              end_code:    0xFFFF_u32,
-              id_delta:    1,
-              use_delta:   true,
-              glyph_ids:   [] of UInt16,
+              start_code: 0xFFFF_u32,
+              end_code:   0xFFFF_u32,
+              id_delta:   1,
+              use_delta:  true,
+              glyph_ids:  [] of UInt16,
             }
 
             segments
@@ -459,7 +456,7 @@ module PDF
             write_uint16(io, 12_u16) # format
             write_uint16(io, 0_u16)  # reserved
             write_uint32(io, length.to_u32)
-            write_uint32(io, 0_u32)  # language
+            write_uint32(io, 0_u32) # language
             write_uint32(io, groups.size.to_u32)
 
             groups.each do |group|

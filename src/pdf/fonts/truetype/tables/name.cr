@@ -4,28 +4,28 @@ module PDF
       module Tables
         # Name IDs defined by the TrueType specification
         module NameID
-          COPYRIGHT          =  0_u16
-          FONT_FAMILY        =  1_u16
-          FONT_SUBFAMILY     =  2_u16
-          UNIQUE_ID          =  3_u16
-          FULL_NAME          =  4_u16
-          VERSION_STRING     =  5_u16
-          POSTSCRIPT_NAME    =  6_u16
-          TRADEMARK          =  7_u16
-          MANUFACTURER       =  8_u16
-          DESIGNER           =  9_u16
-          DESCRIPTION        = 10_u16
-          VENDOR_URL         = 11_u16
-          DESIGNER_URL       = 12_u16
-          LICENSE            = 13_u16
-          LICENSE_URL        = 14_u16
-          PREFERRED_FAMILY   = 16_u16
+          COPYRIGHT           =  0_u16
+          FONT_FAMILY         =  1_u16
+          FONT_SUBFAMILY      =  2_u16
+          UNIQUE_ID           =  3_u16
+          FULL_NAME           =  4_u16
+          VERSION_STRING      =  5_u16
+          POSTSCRIPT_NAME     =  6_u16
+          TRADEMARK           =  7_u16
+          MANUFACTURER        =  8_u16
+          DESIGNER            =  9_u16
+          DESCRIPTION         = 10_u16
+          VENDOR_URL          = 11_u16
+          DESIGNER_URL        = 12_u16
+          LICENSE             = 13_u16
+          LICENSE_URL         = 14_u16
+          PREFERRED_FAMILY    = 16_u16
           PREFERRED_SUBFAMILY = 17_u16
-          COMPATIBLE_FULL    = 18_u16
-          SAMPLE_TEXT        = 19_u16
-          POSTSCRIPT_CID     = 20_u16
-          WWS_FAMILY         = 21_u16
-          WWS_SUBFAMILY      = 22_u16
+          COMPATIBLE_FULL     = 18_u16
+          SAMPLE_TEXT         = 19_u16
+          POSTSCRIPT_CID      = 20_u16
+          WWS_FAMILY          = 21_u16
+          WWS_SUBFAMILY       = 22_u16
         end
 
         # A single name record
@@ -43,7 +43,7 @@ module PDF
             @language_id : UInt16,
             @name_id : UInt16,
             @length : UInt16,
-            @offset : UInt16
+            @offset : UInt16,
           )
           end
         end
@@ -98,7 +98,7 @@ module PDF
           def get(name_id : UInt16) : String?
             # Priority: Windows Unicode English > Mac Roman English > Any
             preferred_record = find_preferred_record(name_id)
-            return nil unless preferred_record
+            return unless preferred_record
 
             extract_string(preferred_record)
           end
@@ -121,26 +121,26 @@ module PDF
           # Find the preferred record for a name ID
           private def find_preferred_record(name_id : UInt16) : NameRecord?
             # Collect matching records
-            matches = @records.select { |r| r.name_id == name_id }
-            return nil if matches.empty?
+            matches = @records.select { |record| record.name_id == name_id }
+            return if matches.empty?
 
             # Windows Unicode English (platform 3, encoding 1, language 0x409)
-            if r = matches.find { |m| m.platform_id == 3 && m.encoding_id == 1 && m.language_id == 0x0409 }
+            if r = matches.find { |candidate| candidate.platform_id == 3 && candidate.encoding_id == 1 && candidate.language_id == 0x0409 }
               return r
             end
 
             # Windows Unicode any language
-            if r = matches.find { |m| m.platform_id == 3 && m.encoding_id == 1 }
+            if r = matches.find { |candidate| candidate.platform_id == 3 && candidate.encoding_id == 1 }
               return r
             end
 
             # Unicode platform
-            if r = matches.find { |m| m.platform_id == 0 }
+            if r = matches.find { |candidate| candidate.platform_id == 0 }
               return r
             end
 
             # Mac Roman English
-            if r = matches.find { |m| m.platform_id == 1 && m.encoding_id == 0 && m.language_id == 0 }
+            if r = matches.find { |candidate| candidate.platform_id == 1 && candidate.encoding_id == 0 && candidate.language_id == 0 }
               return r
             end
 
@@ -150,7 +150,7 @@ module PDF
 
           # Extract a string from a name record
           private def extract_string(record : NameRecord) : String?
-            return nil if record.offset + record.length > @string_data.size
+            return if record.offset + record.length > @string_data.size
 
             data = @string_data[record.offset, record.length]
 
@@ -210,13 +210,13 @@ module PDF
             write_uint16(io, @records.size.to_u16)
             write_uint16(io, header_size.to_u16)
 
-            @records.each do |r|
-              write_uint16(io, r.platform_id)
-              write_uint16(io, r.encoding_id)
-              write_uint16(io, r.language_id)
-              write_uint16(io, r.name_id)
-              write_uint16(io, r.length)
-              write_uint16(io, r.offset)
+            @records.each do |record|
+              write_uint16(io, record.platform_id)
+              write_uint16(io, record.encoding_id)
+              write_uint16(io, record.language_id)
+              write_uint16(io, record.name_id)
+              write_uint16(io, record.length)
+              write_uint16(io, record.offset)
             end
 
             io.write(@string_data)

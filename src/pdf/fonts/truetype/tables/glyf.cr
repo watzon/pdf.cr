@@ -42,7 +42,7 @@ module PDF
             @x_max : Int16,
             @y_max : Int16,
             @raw_data : Bytes,
-            @component_glyph_ids : Array(UInt16) = [] of UInt16
+            @component_glyph_ids : Array(UInt16) = [] of UInt16,
           )
           end
 
@@ -249,7 +249,6 @@ module PDF
             loop do
               break if io.pos + 4 > data.size
 
-              flags_pos = io.pos
               flags = read_uint16(io)
               old_glyph_id = read_uint16(io)
 

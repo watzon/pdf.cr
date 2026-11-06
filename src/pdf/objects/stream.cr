@@ -134,7 +134,7 @@ module PDF
           @dictionary[Name::FILTER] = @filters.first.name
         else
           filter_array = Array.new
-          @filters.each { |f| filter_array << f.name }
+          @filters.each { |filter| filter_array << filter.name }
           @dictionary[Name::FILTER] = filter_array
         end
       end

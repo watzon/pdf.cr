@@ -71,10 +71,10 @@ module PDF
 
         # Check if the sfnt version is valid
         private def self.valid_sfnt_version?(version : UInt32) : Bool
-          version == 0x00010000 ||        # TrueType
-            version == 0x4F54544F ||       # 'OTTO' (CFF)
-            version == 0x74727565 ||       # 'true' (Apple TrueType)
-            version == 0x74797031          # 'typ1' (Type 1)
+          version == 0x00010000 ||   # TrueType
+            version == 0x4F54544F || # 'OTTO' (CFF)
+            version == 0x74727565 || # 'true' (Apple TrueType)
+            version == 0x74797031    # 'typ1' (Type 1)
         end
 
         # Check if this is a TrueType font (glyf outlines)
@@ -95,11 +95,11 @@ module PDF
         # Get raw table data
         def table_data(tag : String) : Bytes?
           record = @table_records[tag]?
-          return nil unless record
+          return unless record
 
           start_offset = record.offset.to_i
           end_offset = start_offset + record.length.to_i
-          return nil if end_offset > @data.size
+          return if end_offset > @data.size
 
           @data[start_offset...end_offset]
         end

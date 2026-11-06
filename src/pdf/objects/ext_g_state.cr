@@ -19,7 +19,7 @@ module PDF
     # gs.blend_mode = PDF::Content::GraphicsState::BlendMode::Multiply
     #
     # # Use in page:
-    # page.set_graphics_state(gs)
+    # page.apply_graphics_state(gs)
     # ```
     class ExtGState < Base
       # Type is always ExtGState
@@ -93,7 +93,14 @@ module PDF
         dict = Dictionary.new
         dict["Type"] = TYPE
 
-        # Opacity parameters
+        add_opacity_entries(dict)
+        add_line_entries(dict)
+        add_overprint_entries(dict)
+
+        dict
+      end
+
+      private def add_opacity_entries(dict : Dictionary) : Nil
         if fill_alpha = @fill_opacity
           dict["ca"] = Number.new(fill_alpha)
         end
@@ -111,7 +118,9 @@ module PDF
         if sm = @soft_mask
           dict["SMask"] = sm
         end
+      end
 
+      private def add_line_entries(dict : Dictionary) : Nil
         # Line width
         if lw = @line_width
           dict["LW"] = Number.new(lw)
@@ -143,7 +152,9 @@ module PDF
         if ri = @rendering_intent
           dict["RI"] = Name.new(ri.to_pdf_name)
         end
+      end
 
+      private def add_overprint_entries(dict : Dictionary) : Nil
         # Overprint mode
         if opm = @overprint_mode
           dict["OPM"] = Number.new(opm)
@@ -168,8 +179,6 @@ module PDF
         if tk = @text_knockout
           dict["TK"] = Boolean.new(tk)
         end
-
-        dict
       end
 
       def to_pdf : String

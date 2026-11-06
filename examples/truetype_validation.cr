@@ -202,7 +202,7 @@ pdf.page do |page|
   page.font dejavu, size: 11
   page.text "The font embedded in this PDF is subsetted to include only glyphs used.", at: {72, 710}
   page.text "Original DejaVu Sans: ~741 KB", at: {72, 692}
-  
+
   # Get subset size
   subset_size = dejavu.subset_data.size
   page.text "Subset size: #{(subset_size / 1024.0).round(2)} KB", at: {72, 674}

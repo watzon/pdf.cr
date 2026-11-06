@@ -9,7 +9,12 @@ module PDF
     # bool.to_pdf # => "true"
     # ```
     class Boolean < Base
-      getter value : Bool
+      getter? value : Bool
+
+      # Kept for consistency with the other object wrappers' #value.
+      def value : Bool
+        @value
+      end
 
       def initialize(@value : Bool)
       end

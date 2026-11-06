@@ -54,7 +54,7 @@ describe PDF::Filters::Flate do
 
     it "round-trips binary data" do
       filter = PDF::Filters::Flate.new
-      original = Bytes.new(256) { |i| i.to_u8 }
+      original = Bytes.new(256, &.to_u8)
 
       compressed = filter.encode(original)
       decompressed = filter.decode(compressed)

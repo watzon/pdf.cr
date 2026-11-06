@@ -47,7 +47,7 @@ describe PDF::Document do
     it "yields the page for content" do
       doc = PDF::Document.new
       page_received = nil
-      doc.page { |p| page_received = p }
+      doc.page { |current_page| page_received = current_page }
       page_received.should_not be_nil
       page_received.should be_a(PDF::Page)
     end
