@@ -11,7 +11,7 @@ module PDF
       *,
       at : Tuple(Number, Number) = {0, 0},
       width : Float64? = nil,
-      height : Float64? = nil
+      height : Float64? = nil,
     ) : SVG::Renderer
       parser = SVG::Parser.new(svg_data)
       renderer = SVG::Renderer.new(
