@@ -17,6 +17,11 @@ private def text_baselines(content : String) : Hash(String, Float64)
   result
 end
 
+# Each drawn text string with its baseline y, in drawing order.
+private def drawn_texts(content : String) : Array(Tuple(String, Float64))
+  content.scan(/[\d.-]+ ([\d.-]+) Td\n\((.*?)\) Tj/).map { |match| {match[2], match[1].to_f} }
+end
+
 describe PDF::Table do
   describe "percentage column widths" do
     it "resolves percentages against table_width" do
@@ -415,6 +420,89 @@ describe PDF::Table do
         table.cells[1][1].subtable.should be(inner)
       end
     end
+  end
+end
+
+describe "PDF::Table pagination and specificity edge cases" do
+  it "moves header rows to the next page with the first body row" do
+    doc = PDF::Document.new
+    doc.page do |page|
+      table = PDF::Table.new(data: %w[H1 H2 a b].map { |text| [text] of PDF::Table::CellData }, header: 2, column_widths: [100.0])
+      h = table.row_heights
+      breaks = 0
+      # Room for both header rows but not for the first body row.
+      table.draw_with_page_breaks(page, x: 50.0, y: 700.0, available_height: h[0] + h[1] + 1.0) do
+        breaks += 1
+        {doc.page { }, 700.0}
+      end
+      breaks.should eq(1)
+    end
+
+    doc.pages[0].content_string.should_not contain("(H1) Tj")
+    doc.pages[1].content_string.scan("(H1) Tj").size.should eq(1)
+    doc.pages[1].content_string.scan("(H2) Tj").size.should eq(1)
+    doc.pages[1].content_string.should contain("(b) Tj")
+  end
+
+  it "splits a row taller than a page between its lines and repeats the header" do
+    words = Array.new(400) { |i| "w#{i}" }.join(" ")
+    doc = PDF::Document.new
+    table = nil
+    doc.page(612, 792) do |page|
+      table = page.table([["Header", "Side"], [words, {content: "side", valign: :bottom}]],
+        at: {50, 742}, header: true, column_widths: [100.0, 100.0])
+    end
+    table = table || fail "table not drawn"
+
+    table.row_heights[1].should be > 792.0
+    expected = table.cells[1][0].wrapped_lines
+    drawn = doc.pages.flat_map { |pdf_page| drawn_texts(pdf_page.content_string) }
+    drawn.map(&.[0]).reject { |text| {"Header", "Side", "side"}.includes?(text) }.should eq(expected)
+    drawn.each { |(_, baseline)| baseline.should be >= PDF::Page::TABLE_MARGIN }
+    drawn.count(&.[0].==("side")).should eq(1)
+
+    parts = doc.pages.select(&.content_string.includes?("(w"))
+    parts.size.should be > 1
+    parts.each(&.content_string.scan("(Header) Tj").size.should(eq(1)))
+    table.end_page.should be(doc.pages.last)
+    (table.end_y || fail "end_y not set").should be >= PDF::Page::TABLE_MARGIN
+  end
+
+  it "draws nested tables and images of a split row once" do
+    inner = PDF::Table.new(data: [["inner"] of PDF::Table::CellData])
+    words = Array.new(300) { |i| "w#{i}" }.join(" ")
+    doc = PDF::Document.new
+    doc.page(612, 792) do |page|
+      page.table([[{content: words, colspan: 2}, inner, {image: png, image_width: 20}]], at: {50, 742},
+        column_widths: [50.0, 50.0, 60.0, 40.0])
+    end
+
+    doc.pages.count(&.content_string.includes?("(w")).should be > 1
+    contents = doc.pages.map(&.content_string).join
+    contents.scan("(inner) Tj").size.should eq(1)
+    contents.scan(/ Do\n/).size.should eq(1)
+  end
+
+  it "lets a cell border width and color win over per-side styles" do
+    cell = Options{:content => "a", :border_width => 3, :border_color => "FF0000"}
+    table = PDF::Table.new(data: [[cell, "b"] of PDF::Table::CellData],
+      cell_style: {border_widths: [1, 1, 1, 1], border_colors: ["111111"]})
+    table.cells[0][0].border_width_for(:top).should eq(3.0)
+    table.cells[0][0].border_color_for(:left).should eq("FF0000")
+    table.cells[0][1].border_width_for(:top).should eq(1.0)
+    table.cells[0][1].border_color_for(:left).should eq("111111")
+  end
+
+  it "keeps per-side borders that follow a scalar in the same style" do
+    table = PDF::Table.new(data: [["a"] of PDF::Table::CellData], cell_style: {border_width: 2, border_bottom_width: 4})
+    table.cells[0][0].border_width_for(:top).should eq(2.0)
+    table.cells[0][0].border_width_for(:bottom).should eq(4.0)
+  end
+
+  it "gives a rowspan that runs past the last row its full height" do
+    cell = Options{:content => "1\n2\n3\n4", :rowspan => 3}
+    table = PDF::Table.new(data: [["a", cell] of PDF::Table::CellData])
+    table.row_heights[0].should be_close(table.cells[0][1].natural_height, 0.001)
   end
 end
 

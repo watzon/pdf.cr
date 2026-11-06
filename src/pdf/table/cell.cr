@@ -199,11 +199,15 @@ module PDF
         if list = options[:borders]?
           @borders = Cell.parse_borders(list.to_s)
         end
+        # A scalar width or color applies to all sides, so it also clears
+        # per-side values from a less specific style.
         if bw = Cell.to_float(options[:border_width]?)
           @border_width = bw
+          @border_widths = [nil, nil, nil, nil] of Float64?
         end
         if bc = options[:border_color]?
           @border_color = bc.to_s
+          @border_colors = [nil, nil, nil, nil] of String?
         end
         Options::SIDES.each_index do |side|
           if bw = Cell.to_float(options[Options::BORDER_WIDTH_KEYS[side]]?)
@@ -470,20 +474,49 @@ module PDF
         @border_colors[Options::SIDES.index!(side)] || @border_color
       end
 
+      # Number of wrapped text lines. An image or nested table counts as
+      # one line that cannot split.
+      def line_count : Int32
+        @image || @subtable ? 1 : wrapped_lines.size
+      end
+
+      # Number of text lines that fit in a part of a row with *height*
+      # (at least one, so that a split row always makes progress).
+      def lines_fitting(height : Float64) : Int32
+        fit = ((height - padding_top - padding_bottom) / line_height + WIDTH_EPSILON).floor
+        fit >= 1.0 ? fit.to_i : 1
+      end
+
+      # Height of the part of the cell that holds the wrapped *lines*
+      # (see `#line_count`), with padding.
+      def part_height(lines : Range(Int32, Int32)) : Float64
+        content = if @image || @subtable
+                    lines.includes?(0) ? natural_content_height : 0.0
+                  else
+                    lines.size * line_height
+                  end
+        content + padding_top + padding_bottom
+      end
+
       # Draws the background, borders and content at the cell position.
-      def draw(page : Page) : Nil
+      # With *lines*, draws only those wrapped lines (see `#line_count`):
+      # a part of a row that is split across pages.
+      def draw(page : Page, lines : Range(Int32, Int32)? = nil) : Nil
         return if span_dummy?
 
         draw_background(page)
         draw_borders(page)
 
-        offset = vertical_offset
         if img = @image
-          draw_image(page, img, offset)
+          return unless lines.nil? || lines.includes?(0)
+          draw_image(page, img, vertical_offset(natural_content_height))
         elsif table = @subtable
+          return unless lines.nil? || lines.includes?(0)
+          offset = vertical_offset(natural_content_height)
           table.draw(page, x: @x + padding_left + horizontal_offset(table.total_width), y: @y - padding_top - offset)
         else
-          draw_text(page, offset)
+          text = lines ? wrapped_lines[lines] : wrapped_lines
+          draw_text(page, text, vertical_offset(text.size * line_height))
         end
       end
 
@@ -523,13 +556,13 @@ module PDF
         page.image(img, at: {@x + padding_left + horizontal_offset(w), @y - padding_top - offset - h}, width: w, height: h)
       end
 
-      private def draw_text(page : Page, offset : Float64) : Nil
-        return if @content.empty?
+      private def draw_text(page : Page, text : Array(String), offset : Float64) : Nil
+        return if text.all?(&.empty?)
 
         page.fill_color(@text_color)
         page.font(effective_font_name, size: @font_size)
 
-        wrapped_lines.each_with_index do |line, i|
+        text.each_with_index do |line, i|
           next if line.empty?
           text_x = @x + padding_left + horizontal_offset(text_width(line))
           text_y = @y - padding_top - offset - @font_size - (i * line_height)
@@ -548,10 +581,10 @@ module PDF
         end
       end
 
-      # Offset from the top content edge for `#valign`. Content taller
-      # than the cell stays at the top.
-      private def vertical_offset : Float64
-        free = content_height - natural_content_height
+      # Offset from the top content edge for `#valign`, for content of
+      # *height*. Content taller than the cell stays at the top.
+      private def vertical_offset(height : Float64) : Float64
+        free = content_height - height
         return 0.0 if free <= 0.0
 
         case @valign

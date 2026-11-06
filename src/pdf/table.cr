@@ -139,6 +139,11 @@ module PDF
     # create a new page and return it along with the new y position.
     # Returns the last page and the y position below the table, and sets
     # `end_page` and `end_y` to them.
+    #
+    # Header rows stay on the page with the first body rows. A row that
+    # does not fit on a new page splits between its text lines and
+    # continues on the next pages (an image or nested table does not
+    # split). Rows linked by rowspan cells do not split.
     def draw_with_page_breaks(
       page : Page,
       *,
@@ -150,35 +155,36 @@ module PDF
       current_page = page
       current_y = y
       remaining_height = available_height
-      # True right after a page break, until a body row is drawn. A group
-      # that does not fit on a fresh page is drawn anyway (avoids a loop).
+      # True on a new page until a body row is drawn. A group that does
+      # not fit on a fresh page does not cause another break (avoids a
+      # loop).
       fresh_page = false
 
-      row_groups.each do |group|
-        group_height = group.sum { |group_row| @row_heights[group_row] }
-
-        if group_height > remaining_height && !fresh_page
+      groups = row_groups
+      groups.each_with_index do |group, index|
+        if rows_height(group.begin..kept_end(groups, index)) > remaining_height && !fresh_page
           current_page, current_y = block.call
           remaining_height = current_y - 50.0 # margin
           fresh_page = true
 
           # Redraw header rows on new page (unless the header itself is
           # being drawn now)
-          if @header > 0 && group.begin >= @header
-            (0...@header).each do |header_row_idx|
-              draw_row(current_page, header_row_idx, x, current_y)
-              current_y -= @row_heights[header_row_idx]
-              remaining_height -= @row_heights[header_row_idx]
-            end
+          if group.begin >= @header
+            current_y, remaining_height = draw_header(current_page, x, current_y, remaining_height)
           end
         end
 
-        group.each do |group_row|
-          draw_row(current_page, group_row, x, current_y)
-          current_y -= @row_heights[group_row]
-          remaining_height -= @row_heights[group_row]
+        if fresh_page && group.size == 1 && rows_height(group) > remaining_height
+          current_page, current_y, remaining_height = draw_split_row(
+            group.begin, x, current_page, current_y, remaining_height, block)
+        else
+          group.each do |group_row|
+            draw_row(current_page, group_row, x, current_y)
+            current_y -= @row_heights[group_row]
+            remaining_height -= @row_heights[group_row]
+          end
         end
-        fresh_page = false
+        fresh_page = false if group.end >= @header
       end
 
       @end_page = current_page
@@ -199,6 +205,66 @@ module PDF
     private def draw_row(page : Page, row_idx : Int32, x : Float64, y : Float64) : Nil
       position_row(row_idx, x, y)
       @cells[row_idx].each(&.draw(page))
+    end
+
+    private def rows_height(rows : Range(Int32, Int32)) : Float64
+      rows.sum { |row_idx| @row_heights[row_idx] }
+    end
+
+    # Last row that must start on the same page as the group at *index*:
+    # a group of header rows only keeps the first body group with it.
+    private def kept_end(groups : Array(Range(Int32, Int32)), index : Int32) : Int32
+      group = groups[index]
+      return group.end if group.end >= @header
+
+      body = groups[(index + 1)..].find(&.begin.>=(@header))
+      body ? body.end : group.end
+    end
+
+    # Draws the header rows and returns the new y position and remaining
+    # height.
+    private def draw_header(page : Page, x : Float64, y : Float64, remaining : Float64) : Tuple(Float64, Float64)
+      (0...Math.min(@header, @row_count)).each do |header_row_idx|
+        draw_row(page, header_row_idx, x, y)
+        y -= @row_heights[header_row_idx]
+        remaining -= @row_heights[header_row_idx]
+      end
+      {y, remaining}
+    end
+
+    # Draws a row that is taller than the space on a new page in parts.
+    # Each part fills the page with the text lines that fit, and the next
+    # part continues on a new page below the repeated header rows.
+    # Returns the page, y position and remaining height after the row.
+    private def draw_split_row(
+      row_idx : Int32, x : Float64, page : Page, y : Float64, remaining : Float64,
+      new_page : -> Tuple(Page, Float64),
+    ) : Tuple(Page, Float64, Float64)
+      row = @cells[row_idx]
+      starts = Array.new(row.size, 0)
+
+      loop do
+        parts = row.map_with_index do |cell, i|
+          starts[i]...Math.min(starts[i] + cell.lines_fitting(remaining), cell.line_count)
+        end
+        done = row.each_index.all? { |i| row[i].span_dummy? || parts[i].end >= row[i].line_count }
+        height = row.each_index.max_of? { |i| row[i].span_dummy? ? 0.0 : row[i].part_height(parts[i]) } || 0.0
+        height = Math.max(height, remaining) unless done
+
+        position_row(row_idx, x, y)
+        row.each_with_index do |cell, i|
+          cell.height = height
+          cell.draw(page, parts[i])
+        end
+        y -= height
+        remaining -= height
+        return {page, y, remaining} if done
+
+        starts = parts.map(&.end)
+        page, y = new_page.call
+        remaining = y - 50.0 # margin
+        y, remaining = draw_header(page, x, y, remaining) if row_idx >= @header
+      end
     end
 
     # Groups of row indices that must stay on the same page (rows linked
@@ -397,17 +463,11 @@ module PDF
 
           cell_height = cell.natural_height
 
-          if cell.rowspan == 1
-            heights[row_idx] = Math.max(heights[row_idx], cell_height)
-          else
-            # Distribute spanned height equally
-            per_row = cell_height / cell.rowspan
-            (0...cell.rowspan).each do |row_offset|
-              target = row_idx + row_offset
-              if target < @row_count
-                heights[target] = Math.max(heights[target], per_row)
-              end
-            end
+          # Distribute spanned height equally over the rows that exist
+          span = Math.min(cell.rowspan, @row_count - row_idx)
+          per_row = cell_height / span
+          (row_idx...row_idx + span).each do |target|
+            heights[target] = Math.max(heights[target], per_row)
           end
         end
       end
