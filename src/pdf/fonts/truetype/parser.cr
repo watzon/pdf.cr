@@ -71,10 +71,10 @@ module PDF
 
         # Check if the sfnt version is valid
         private def self.valid_sfnt_version?(version : UInt32) : Bool
-          version == 0x00010000 ||        # TrueType
-            version == 0x4F54544F ||       # 'OTTO' (CFF)
-            version == 0x74727565 ||       # 'true' (Apple TrueType)
-            version == 0x74797031          # 'typ1' (Type 1)
+          version == 0x00010000 ||   # TrueType
+            version == 0x4F54544F || # 'OTTO' (CFF)
+            version == 0x74727565 || # 'true' (Apple TrueType)
+            version == 0x74797031    # 'typ1' (Type 1)
         end
 
         # Check if this is a TrueType font (glyf outlines)

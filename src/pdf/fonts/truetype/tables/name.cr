@@ -4,28 +4,28 @@ module PDF
       module Tables
         # Name IDs defined by the TrueType specification
         module NameID
-          COPYRIGHT          =  0_u16
-          FONT_FAMILY        =  1_u16
-          FONT_SUBFAMILY     =  2_u16
-          UNIQUE_ID          =  3_u16
-          FULL_NAME          =  4_u16
-          VERSION_STRING     =  5_u16
-          POSTSCRIPT_NAME    =  6_u16
-          TRADEMARK          =  7_u16
-          MANUFACTURER       =  8_u16
-          DESIGNER           =  9_u16
-          DESCRIPTION        = 10_u16
-          VENDOR_URL         = 11_u16
-          DESIGNER_URL       = 12_u16
-          LICENSE            = 13_u16
-          LICENSE_URL        = 14_u16
-          PREFERRED_FAMILY   = 16_u16
+          COPYRIGHT           =  0_u16
+          FONT_FAMILY         =  1_u16
+          FONT_SUBFAMILY      =  2_u16
+          UNIQUE_ID           =  3_u16
+          FULL_NAME           =  4_u16
+          VERSION_STRING      =  5_u16
+          POSTSCRIPT_NAME     =  6_u16
+          TRADEMARK           =  7_u16
+          MANUFACTURER        =  8_u16
+          DESIGNER            =  9_u16
+          DESCRIPTION         = 10_u16
+          VENDOR_URL          = 11_u16
+          DESIGNER_URL        = 12_u16
+          LICENSE             = 13_u16
+          LICENSE_URL         = 14_u16
+          PREFERRED_FAMILY    = 16_u16
           PREFERRED_SUBFAMILY = 17_u16
-          COMPATIBLE_FULL    = 18_u16
-          SAMPLE_TEXT        = 19_u16
-          POSTSCRIPT_CID     = 20_u16
-          WWS_FAMILY         = 21_u16
-          WWS_SUBFAMILY      = 22_u16
+          COMPATIBLE_FULL     = 18_u16
+          SAMPLE_TEXT         = 19_u16
+          POSTSCRIPT_CID      = 20_u16
+          WWS_FAMILY          = 21_u16
+          WWS_SUBFAMILY       = 22_u16
         end
 
         # A single name record
@@ -43,7 +43,7 @@ module PDF
             @language_id : UInt16,
             @name_id : UInt16,
             @length : UInt16,
-            @offset : UInt16
+            @offset : UInt16,
           )
           end
         end

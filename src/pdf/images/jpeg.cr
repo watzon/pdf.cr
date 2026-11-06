@@ -12,8 +12,8 @@ module PDF
     #
     # ```
     # jpeg = PDF::Images::JPEG.load("photo.jpg")
-    # jpeg.width      # => 800
-    # jpeg.height     # => 600
+    # jpeg.width       # => 800
+    # jpeg.height      # => 600
     # jpeg.color_space # => /DeviceRGB
     # ```
     class JPEG < Base

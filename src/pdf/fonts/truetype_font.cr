@@ -188,7 +188,7 @@ module PDF
       def cid_to_gid_map_stream : Objects::Stream
         # Ensure subset is generated so we have the mapping
         subset_data
-        
+
         stream = Objects::Stream.new
         stream.data = build_cid_to_gid_map
         stream.add_filter(Filters::Flate.new)
@@ -204,17 +204,17 @@ module PDF
           glyph_id = @parser.glyph_id(char)
           max_cid = glyph_id if glyph_id > max_cid
         end
-        
+
         # Build array of GID mappings (2 bytes per entry)
         # Entry at index i gives the new GID for original GID (CID) i
         io = IO::Memory.new
-        
+
         (0_u16..max_cid).each do |cid|
           new_gid = @subsetter.new_glyph_id(cid)
           io.write_byte(((new_gid >> 8) & 0xFF).to_u8)
           io.write_byte((new_gid & 0xFF).to_u8)
         end
-        
+
         io.to_slice
       end
 
@@ -222,7 +222,7 @@ module PDF
       # CIDs are original glyph IDs from the source font
       private def build_widths_array : Objects::Array
         widths = Objects::Array.new
-        
+
         # Get original glyph IDs for all used characters
         glyph_ids = @used_chars.map { |c| @parser.glyph_id(c) }.uniq.sort
 
@@ -317,7 +317,7 @@ module PDF
       # to the remapped glyph IDs in the subset font.
       def encode_text(text : String) : String
         use(text)
-        
+
         String.build do |io|
           io << '<'
           text.each_char do |char|

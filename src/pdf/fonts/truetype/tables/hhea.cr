@@ -73,7 +73,7 @@ module PDF
             @reserved3 : Int16,
             @reserved4 : Int16,
             @metric_data_format : Int16,
-            @number_of_h_metrics : UInt16
+            @number_of_h_metrics : UInt16,
           )
           end
 

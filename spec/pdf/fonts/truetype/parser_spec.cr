@@ -3,7 +3,6 @@ require "../../../spec_helper"
 TRUETYPE_PARSER_SPEC_FONT_PATH = "spec/fixtures/fonts/DejaVuSans.ttf"
 
 describe PDF::Fonts::TrueType::Parser do
-
   describe ".parse" do
     it "parses a valid TrueType font file" do
       parser = PDF::Fonts::TrueType::Parser.parse(TRUETYPE_PARSER_SPEC_FONT_PATH)

@@ -294,8 +294,8 @@ module PDF
     # Sets the stroke color from a hex string.
     #
     # ```
-    # page.stroke_color("#FF0000")  # Red
-    # page.stroke_color("#0F0")     # Green (short form)
+    # page.stroke_color("#FF0000") # Red
+    # page.stroke_color("#0F0")    # Green (short form)
     # ```
     def stroke_color(hex : String) : self
       r, g, b = Content::Color.from_hex(hex)
@@ -305,8 +305,8 @@ module PDF
     # Sets the fill color from a hex string.
     #
     # ```
-    # page.fill_color("#0000FF")  # Blue
-    # page.fill_color("#F0F")     # Magenta (short form)
+    # page.fill_color("#0000FF") # Blue
+    # page.fill_color("#F0F")    # Magenta (short form)
     # ```
     def fill_color(hex : String) : self
       r, g, b = Content::Color.from_hex(hex)
@@ -316,7 +316,7 @@ module PDF
     # Sets the stroke color (grayscale, 0.0 = black, 1.0 = white).
     #
     # ```
-    # page.stroke_gray(0.5)  # 50% gray
+    # page.stroke_gray(0.5) # 50% gray
     # ```
     def stroke_gray(gray : Number) : self
       @content << "#{format_number(gray.to_f)} G\n"
@@ -326,7 +326,7 @@ module PDF
     # Sets the fill color (grayscale, 0.0 = black, 1.0 = white).
     #
     # ```
-    # page.fill_gray(0.5)  # 50% gray
+    # page.fill_gray(0.5) # 50% gray
     # ```
     def fill_gray(gray : Number) : self
       @content << "#{format_number(gray.to_f)} g\n"
@@ -336,7 +336,7 @@ module PDF
     # Sets the stroke color (CMYK, values 0.0 to 1.0).
     #
     # ```
-    # page.stroke_cmyk(0.0, 1.0, 1.0, 0.0)  # Red in CMYK
+    # page.stroke_cmyk(0.0, 1.0, 1.0, 0.0) # Red in CMYK
     # ```
     def stroke_cmyk(c : Number, m : Number, y : Number, k : Number) : self
       @content << "#{format_number(c.to_f)} #{format_number(m.to_f)} "
@@ -347,7 +347,7 @@ module PDF
     # Sets the fill color (CMYK, values 0.0 to 1.0).
     #
     # ```
-    # page.fill_cmyk(1.0, 0.0, 0.0, 0.0)  # Cyan
+    # page.fill_cmyk(1.0, 0.0, 0.0, 0.0) # Cyan
     # ```
     def fill_cmyk(c : Number, m : Number, y : Number, k : Number) : self
       @content << "#{format_number(c.to_f)} #{format_number(m.to_f)} "
@@ -530,7 +530,7 @@ module PDF
     #
     # ```
     # page.move_to(100, 100)
-    # page.curve_to(150, 200, 250, 200, 300, 100)  # Two control points, then endpoint
+    # page.curve_to(150, 200, 250, 200, 300, 100) # Two control points, then endpoint
     # page.stroke
     # ```
     def curve_to(x1 : Number, y1 : Number, x2 : Number, y2 : Number, x3 : Number, y3 : Number) : self
@@ -545,7 +545,7 @@ module PDF
     #
     # ```
     # page.move_to(100, 100)
-    # page.curve_v(200, 150, 200, 100)  # Second control point, then endpoint
+    # page.curve_v(200, 150, 200, 100) # Second control point, then endpoint
     # page.stroke
     # ```
     def curve_v(x2 : Number, y2 : Number, x3 : Number, y3 : Number) : self
@@ -559,7 +559,7 @@ module PDF
     #
     # ```
     # page.move_to(100, 100)
-    # page.curve_y(150, 150, 200, 100)  # First control point, then endpoint
+    # page.curve_y(150, 150, 200, 100) # First control point, then endpoint
     # page.stroke
     # ```
     def curve_y(x1 : Number, y1 : Number, x3 : Number, y3 : Number) : self
@@ -704,7 +704,7 @@ module PDF
     # ```
     # page.save_graphics_state do
     #   page.translate(100, 50)
-    #   page.rectangle(0, 0, 50, 50)  # Draws at (100, 50)
+    #   page.rectangle(0, 0, 50, 50) # Draws at (100, 50)
     #   page.fill
     # end
     # ```
@@ -716,8 +716,8 @@ module PDF
     #
     # ```
     # page.save_graphics_state do
-    #   page.scale(2.0, 2.0)  # Double size
-    #   page.rectangle(50, 50, 25, 25)  # Appears as 50x50 at (100, 100)
+    #   page.scale(2.0, 2.0)           # Double size
+    #   page.rectangle(50, 50, 25, 25) # Appears as 50x50 at (100, 100)
     #   page.fill
     # end
     # ```
@@ -737,7 +737,7 @@ module PDF
     # page.save_graphics_state do
     #   page.translate(300, 400)
     #   page.rotate(45)
-    #   page.rectangle(-25, -25, 50, 50)  # Rotated 45 degrees
+    #   page.rectangle(-25, -25, 50, 50) # Rotated 45 degrees
     #   page.fill
     # end
     # ```
@@ -754,7 +754,7 @@ module PDF
     #
     # ```
     # page.save_graphics_state do
-    #   page.skew(15, 0)  # Skew along X axis
+    #   page.skew(15, 0) # Skew along X axis
     #   page.rectangle(100, 100, 50, 50)
     #   page.fill
     # end
@@ -773,7 +773,7 @@ module PDF
     # This is a convenience method that uses ExtGState.
     #
     # ```
-    # page.opacity(0.5)  # 50% opacity for fill
+    # page.opacity(0.5) # 50% opacity for fill
     # page.fill_color(:red)
     # page.rectangle(100, 100, 100, 100)
     # page.fill
@@ -787,7 +787,7 @@ module PDF
     # Sets the stroke opacity (0.0 = transparent, 1.0 = opaque).
     #
     # ```
-    # page.stroke_opacity(0.5)  # 50% opacity for stroke
+    # page.stroke_opacity(0.5) # 50% opacity for stroke
     # page.stroke_color(:blue)
     # page.line_width(5)
     # page.rectangle(100, 100, 100, 100)
@@ -1006,7 +1006,7 @@ module PDF
     # Angles are in degrees, measured counterclockwise from the positive X axis.
     #
     # ```
-    # page.arc(200, 200, 50, 0, 90)  # Quarter circle
+    # page.arc(200, 200, 50, 0, 90) # Quarter circle
     # page.stroke
     # ```
     def arc(cx : Number, cy : Number, radius : Number, start_angle : Number, end_angle : Number) : self
@@ -1049,7 +1049,7 @@ module PDF
 
     # Draws a single arc segment using a cubic Bezier curve.
     private def draw_arc_segment(cx : Float64, cy : Float64, rx : Float64, ry : Float64,
-                                  start_angle : Float64, end_angle : Float64) : Nil
+                                 start_angle : Float64, end_angle : Float64) : Nil
       # Calculate endpoints
       x1 = cx + rx * Math.cos(start_angle)
       y1 = cy + ry * Math.sin(start_angle)

@@ -12,9 +12,9 @@ module PDF
     #
     # ```
     # png = PDF::Images::PNG.load("logo.png")
-    # png.width       # => 200
-    # png.height      # => 100
-    # png.has_alpha?  # => true
+    # png.width      # => 200
+    # png.height     # => 100
+    # png.has_alpha? # => true
     # ```
     class PNG < Base
       # Decoded RGB pixel data (no alpha)

@@ -121,7 +121,7 @@ module PDF
             @us_break_char : UInt16? = nil,
             @us_max_context : UInt16? = nil,
             @us_lower_optical_point_size : UInt16? = nil,
-            @us_upper_optical_point_size : UInt16? = nil
+            @us_upper_optical_point_size : UInt16? = nil,
           )
           end
 

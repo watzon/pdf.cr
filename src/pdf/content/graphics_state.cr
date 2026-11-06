@@ -66,7 +66,7 @@ module PDF
           when Saturation then "Saturation"
           when Color      then "Color"
           when Luminosity then "Luminosity"
-          else            raise "Unknown blend mode"
+          else                 raise "Unknown blend mode"
           end
         end
       end
@@ -84,7 +84,7 @@ module PDF
           when RelativeColorimetric then "RelativeColorimetric"
           when Saturation           then "Saturation"
           when Perceptual           then "Perceptual"
-          else                      raise "Unknown rendering intent"
+          else                           raise "Unknown rendering intent"
           end
         end
       end

@@ -67,7 +67,7 @@ module PDF
             @max_stack_elements : UInt16? = nil,
             @max_size_of_instructions : UInt16? = nil,
             @max_component_elements : UInt16? = nil,
-            @max_component_depth : UInt16? = nil
+            @max_component_depth : UInt16? = nil,
           )
           end
 

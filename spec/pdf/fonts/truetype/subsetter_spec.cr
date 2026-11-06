@@ -3,7 +3,6 @@ require "../../../spec_helper"
 TRUETYPE_SUBSETTER_SPEC_FONT_PATH = "spec/fixtures/fonts/DejaVuSans.ttf"
 
 describe PDF::Fonts::TrueType::Subsetter do
-
   describe "#subset" do
     it "creates a subset font with used characters" do
       parser = PDF::Fonts::TrueType::Parser.parse(TRUETYPE_SUBSETTER_SPEC_FONT_PATH)

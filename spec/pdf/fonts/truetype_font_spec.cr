@@ -116,10 +116,10 @@ describe PDF::Fonts::TrueTypeFont do
       hex_content = encoded[1..-2] # Remove < and >
       hex_content.size.should eq(4)
     end
-    
+
     it "encodes Unicode characters correctly" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
-      
+
       # Cyrillic text
       encoded = font.encode_text("Привет")
       encoded.should start_with("<")
@@ -127,10 +127,10 @@ describe PDF::Fonts::TrueTypeFont do
       # Each character needs 4 hex digits
       (encoded.size - 2).should eq(6 * 4) # 6 chars * 4 hex digits
     end
-    
+
     it "handles mixed ASCII and Unicode" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
-      
+
       encoded = font.encode_text("ABC Привет")
       encoded.should start_with("<")
       encoded.should end_with(">")
@@ -148,7 +148,7 @@ describe PDF::Fonts::TrueTypeFont do
       dict["Subtype"].should eq(PDF::Objects::Name.new("Type0"))
       dict["Encoding"].should eq(PDF::Objects::Name.new("Identity-H"))
     end
-    
+
     it "includes BaseFont with subset prefix" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font.use("Test")
@@ -171,19 +171,19 @@ describe PDF::Fonts::TrueTypeFont do
       dict["Subtype"].should eq(PDF::Objects::Name.new("CIDFontType2"))
       dict["CIDSystemInfo"].should be_a(PDF::Objects::Dictionary)
     end
-    
+
     it "includes CIDSystemInfo with Adobe Identity" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font.use("Test")
 
       dict = font.cid_font_dictionary
       cid_info = dict["CIDSystemInfo"].as(PDF::Objects::Dictionary)
-      
+
       cid_info["Registry"].should eq(PDF::Objects::Str.new("Adobe"))
       cid_info["Ordering"].should eq(PDF::Objects::Str.new("Identity"))
       cid_info["Supplement"].should eq(PDF::Objects::Number.new(0))
     end
-    
+
     it "includes W array with glyph widths" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font.use("ABC")
@@ -193,7 +193,7 @@ describe PDF::Fonts::TrueTypeFont do
       widths.should be_a(PDF::Objects::Array)
       widths.as(PDF::Objects::Array).size.should be > 0
     end
-    
+
     it "includes default width DW" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font.use("Test")
@@ -219,7 +219,7 @@ describe PDF::Fonts::TrueTypeFont do
       dict["Descent"].should be_a(PDF::Objects::Number)
       dict["StemV"].should be_a(PDF::Objects::Number)
     end
-    
+
     it "includes CapHeight" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font.use("Test")
@@ -227,7 +227,7 @@ describe PDF::Fonts::TrueTypeFont do
       dict = font.font_descriptor
       dict["CapHeight"].should be_a(PDF::Objects::Number)
     end
-    
+
     it "has valid FontBBox" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font.use("Test")
@@ -235,18 +235,18 @@ describe PDF::Fonts::TrueTypeFont do
       dict = font.font_descriptor
       bbox = dict["FontBBox"].as(PDF::Objects::Array)
       bbox.size.should eq(4)
-      
+
       # Bounding box should have valid structure (xMin, yMin, xMax, yMax)
       # xMax should be > xMin, yMax should be > yMin
       x_min = bbox[0].as(PDF::Objects::Number).value.to_i
       y_min = bbox[1].as(PDF::Objects::Number).value.to_i
       x_max = bbox[2].as(PDF::Objects::Number).value.to_i
       y_max = bbox[3].as(PDF::Objects::Number).value.to_i
-      
+
       x_max.should be > x_min
       y_max.should be > y_min
     end
-    
+
     it "has positive Ascent and negative Descent" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font.use("Test")
@@ -254,11 +254,11 @@ describe PDF::Fonts::TrueTypeFont do
       dict = font.font_descriptor
       ascent = dict["Ascent"].as(PDF::Objects::Number).value.to_i
       descent = dict["Descent"].as(PDF::Objects::Number).value.to_i
-      
+
       ascent.should be > 0
       descent.should be < 0
     end
-    
+
     it "has positive StemV" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font.use("Test")
@@ -267,14 +267,14 @@ describe PDF::Fonts::TrueTypeFont do
       stem_v = dict["StemV"].as(PDF::Objects::Number).value.to_i
       stem_v.should be > 0
     end
-    
+
     it "has correct font flags" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font.use("Test")
 
       dict = font.font_descriptor
       flags = dict["Flags"].as(PDF::Objects::Number).value.to_u32
-      
+
       # Should have Nonsymbolic flag (bit 5, value 32)
       (flags & 32).should be > 0
     end
@@ -290,7 +290,7 @@ describe PDF::Fonts::TrueTypeFont do
       stream.should be_a(PDF::Objects::Stream)
       stream[PDF::Objects::Name.new("Length1")].should be_a(PDF::Objects::Number)
     end
-    
+
     it "has FlateDecode filter after serialization" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font.use("Test")
@@ -300,17 +300,17 @@ describe PDF::Fonts::TrueTypeFont do
       pdf_output = stream.to_pdf
       pdf_output.should contain("/Filter /FlateDecode")
     end
-    
+
     it "compresses the font data" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font.use("Test")
 
       stream = font.font_file_stream
-      
+
       # Encoded data should be smaller than or equal to original
       original_length = font.subset_data.size
       encoded = stream.encoded_data
-      
+
       # For compressible data, encoded should generally be smaller
       # (but we don't require it - sometimes compression adds overhead)
       encoded.size.should be > 0
@@ -326,7 +326,7 @@ describe PDF::Fonts::TrueTypeFont do
 
       stream.should be_a(PDF::Objects::Stream)
     end
-    
+
     it "has FlateDecode filter after serialization" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font.use("ABC")
@@ -336,7 +336,7 @@ describe PDF::Fonts::TrueTypeFont do
       pdf_output.should contain("/Filter /FlateDecode")
     end
   end
-  
+
   describe "#cid_to_gid_map_stream" do
     it "returns CIDToGIDMap stream" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
@@ -346,7 +346,7 @@ describe PDF::Fonts::TrueTypeFont do
 
       stream.should be_a(PDF::Objects::Stream)
     end
-    
+
     it "has FlateDecode filter after serialization" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font.use("ABC")
@@ -356,27 +356,27 @@ describe PDF::Fonts::TrueTypeFont do
       pdf_output.should contain("/Filter /FlateDecode")
     end
   end
-  
+
   describe "#subset_data" do
     it "returns subset font bytes smaller than original" do
       font = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font.use("ABC") # Only use 3 characters
-      
+
       original_size = File.size(TRUETYPE_FONT_SPEC_PATH)
       subset_size = font.subset_data.size
-      
+
       subset_size.should be < original_size
     end
-    
+
     it "includes more glyphs with more characters" do
       font1 = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font1.use("A")
       subset1 = font1.subset_data.size
-      
+
       font2 = PDF::Fonts::TrueTypeFont.load(TRUETYPE_FONT_SPEC_PATH)
       font2.use("The quick brown fox jumps over the lazy dog")
       subset2 = font2.subset_data.size
-      
+
       subset2.should be > subset1
     end
   end

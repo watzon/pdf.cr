@@ -42,7 +42,7 @@ module PDF
             @x_max : Int16,
             @y_max : Int16,
             @raw_data : Bytes,
-            @component_glyph_ids : Array(UInt16) = [] of UInt16
+            @component_glyph_ids : Array(UInt16) = [] of UInt16,
           )
           end
 

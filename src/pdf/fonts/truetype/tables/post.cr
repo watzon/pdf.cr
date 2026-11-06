@@ -47,7 +47,7 @@ module PDF
             @min_mem_type1 : UInt32,
             @max_mem_type1 : UInt32,
             @glyph_name_indices : Array(UInt16)? = nil,
-            @glyph_names : Array(String)? = nil
+            @glyph_names : Array(String)? = nil,
           )
           end
 
