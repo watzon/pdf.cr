@@ -49,7 +49,8 @@ module PDF
         Luminosity
 
         def to_pdf_name : String
-          member_name || raise "Unknown blend mode"
+          # Member names match the PDF blend mode names exactly.
+          to_s
         end
       end
 
