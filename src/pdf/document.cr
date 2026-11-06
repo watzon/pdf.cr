@@ -75,7 +75,7 @@ module PDF
     #   page.text "Hello!", at: {72, 720}
     # end
     # ```
-    def page(width : Number = 612, height : Number = 792, &block : Page ->) : Page
+    def page(width : Number = 612, height : Number = 792, &) : Page
       page = Page.new(self, width.to_f, height.to_f)
       @pages << page
       yield page
@@ -186,11 +186,21 @@ module PDF
     def info_dict : Objects::Dictionary?
       dict = Objects::Dictionary.new
 
-      dict["Title"] = Objects::Str.unicode(@title.not_nil!) if @title
-      dict["Author"] = Objects::Str.unicode(@author.not_nil!) if @author
-      dict["Subject"] = Objects::Str.unicode(@subject.not_nil!) if @subject
-      dict["Keywords"] = Objects::Str.unicode(@keywords.not_nil!) if @keywords
-      dict["Creator"] = Objects::Str.unicode(@creator.not_nil!) if @creator
+      if title = @title
+        dict["Title"] = Objects::Str.unicode(title)
+      end
+      if author = @author
+        dict["Author"] = Objects::Str.unicode(author)
+      end
+      if subject = @subject
+        dict["Subject"] = Objects::Str.unicode(subject)
+      end
+      if keywords = @keywords
+        dict["Keywords"] = Objects::Str.unicode(keywords)
+      end
+      if creator = @creator
+        dict["Creator"] = Objects::Str.unicode(creator)
+      end
       dict["Producer"] = Objects::Str.unicode(@producer)
 
       # Add creation date

@@ -89,8 +89,8 @@ module PDF
       end
 
       # Iterate over entries
-      def each(&block : Name, Base -> _)
-        @entries.each { |k, v| yield k, v }
+      def each(&)
+        @entries.each { |key, value| yield key, value }
       end
 
       # Get all keys

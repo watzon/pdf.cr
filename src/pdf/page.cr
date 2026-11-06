@@ -669,7 +669,7 @@ module PDF
     end
 
     # Saves the graphics state, yields, then restores.
-    def save_graphics_state(&block) : self
+    def save_graphics_state(&) : self
       save_graphics_state
       yield
       restore_graphics_state
@@ -781,7 +781,7 @@ module PDF
     def opacity(value : Number) : self
       gs = Objects::ExtGState.new
       gs.fill_opacity = value.to_f.clamp(0.0, 1.0)
-      set_graphics_state(gs)
+      apply_graphics_state(gs)
     end
 
     # Sets the stroke opacity (0.0 = transparent, 1.0 = opaque).
@@ -796,7 +796,7 @@ module PDF
     def stroke_opacity(value : Number) : self
       gs = Objects::ExtGState.new
       gs.stroke_opacity = value.to_f.clamp(0.0, 1.0)
-      set_graphics_state(gs)
+      apply_graphics_state(gs)
     end
 
     # Sets both fill and stroke opacity.
@@ -808,7 +808,7 @@ module PDF
       gs = Objects::ExtGState.new
       gs.fill_opacity = fill.to_f.clamp(0.0, 1.0) if fill
       gs.stroke_opacity = stroke.to_f.clamp(0.0, 1.0) if stroke
-      set_graphics_state(gs)
+      apply_graphics_state(gs)
     end
 
     # Sets the blend mode for compositing.
@@ -820,42 +820,42 @@ module PDF
     def blend_mode(mode : Content::GraphicsState::BlendMode) : self
       gs = Objects::ExtGState.new
       gs.blend_mode = mode
-      set_graphics_state(gs)
+      apply_graphics_state(gs)
     end
+
+    private BLEND_MODES_BY_SYMBOL = {
+      normal:      Content::GraphicsState::BlendMode::Normal,
+      multiply:    Content::GraphicsState::BlendMode::Multiply,
+      screen:      Content::GraphicsState::BlendMode::Screen,
+      overlay:     Content::GraphicsState::BlendMode::Overlay,
+      darken:      Content::GraphicsState::BlendMode::Darken,
+      lighten:     Content::GraphicsState::BlendMode::Lighten,
+      color_dodge: Content::GraphicsState::BlendMode::ColorDodge,
+      color_burn:  Content::GraphicsState::BlendMode::ColorBurn,
+      hard_light:  Content::GraphicsState::BlendMode::HardLight,
+      soft_light:  Content::GraphicsState::BlendMode::SoftLight,
+      difference:  Content::GraphicsState::BlendMode::Difference,
+      exclusion:   Content::GraphicsState::BlendMode::Exclusion,
+      hue:         Content::GraphicsState::BlendMode::Hue,
+      saturation:  Content::GraphicsState::BlendMode::Saturation,
+      color:       Content::GraphicsState::BlendMode::Color,
+      luminosity:  Content::GraphicsState::BlendMode::Luminosity,
+    }
 
     def blend_mode(mode : Symbol) : self
-      bm = case mode
-           when :normal      then Content::GraphicsState::BlendMode::Normal
-           when :multiply    then Content::GraphicsState::BlendMode::Multiply
-           when :screen      then Content::GraphicsState::BlendMode::Screen
-           when :overlay     then Content::GraphicsState::BlendMode::Overlay
-           when :darken      then Content::GraphicsState::BlendMode::Darken
-           when :lighten     then Content::GraphicsState::BlendMode::Lighten
-           when :color_dodge then Content::GraphicsState::BlendMode::ColorDodge
-           when :color_burn  then Content::GraphicsState::BlendMode::ColorBurn
-           when :hard_light  then Content::GraphicsState::BlendMode::HardLight
-           when :soft_light  then Content::GraphicsState::BlendMode::SoftLight
-           when :difference  then Content::GraphicsState::BlendMode::Difference
-           when :exclusion   then Content::GraphicsState::BlendMode::Exclusion
-           when :hue         then Content::GraphicsState::BlendMode::Hue
-           when :saturation  then Content::GraphicsState::BlendMode::Saturation
-           when :color       then Content::GraphicsState::BlendMode::Color
-           when :luminosity  then Content::GraphicsState::BlendMode::Luminosity
-           else                   raise ArgumentError.new("Unknown blend mode: #{mode}")
-           end
-      blend_mode(bm)
+      blend_mode(BLEND_MODES_BY_SYMBOL.fetch(mode) { raise ArgumentError.new("Unknown blend mode: #{mode}") })
     end
 
-    # Sets an extended graphics state.
+    # Applies an extended graphics state with the `gs` operator.
     # The ExtGState will be registered as a resource and referenced.
     #
     # ```
     # gs = PDF::Objects::ExtGState.new
     # gs.fill_opacity = 0.5
     # gs.blend_mode = PDF::Content::GraphicsState::BlendMode::Multiply
-    # page.set_graphics_state(gs)
+    # page.apply_graphics_state(gs)
     # ```
-    def set_graphics_state(ext_g_state : Objects::ExtGState) : self
+    def apply_graphics_state(ext_g_state : Objects::ExtGState) : self
       key = register_ext_g_state(ext_g_state)
       @content << "/#{key} gs\n"
       self

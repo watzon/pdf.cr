@@ -32,12 +32,12 @@ module PDF
 
       # Convenience initializer for integer arrays
       def initialize(numbers : ::Array(Int32))
-        @elements = numbers.map { |n| Number.new(n).as(Base) }
+        @elements = numbers.map { |num| Number.new(num).as(Base) }
       end
 
       # Convenience initializer for float arrays
       def initialize(numbers : ::Array(Float64))
-        @elements = numbers.map { |n| Number.new(n).as(Base) }
+        @elements = numbers.map { |num| Number.new(num).as(Base) }
       end
 
       def to_pdf : ::String

@@ -80,7 +80,7 @@ describe PDF::Objects::Array do
       arr << PDF::Objects::Number.new(1)
       arr << PDF::Objects::Number.new(2)
 
-      values = arr.map { |el| el.as(PDF::Objects::Number).value }
+      values = arr.map { |element| element.as(PDF::Objects::Number).value }
       values.should eq([1_i64, 2_i64])
     end
   end
