@@ -90,6 +90,31 @@ describe "formatted text box boundaries" do
     end
   end
 
+  it "returns the text unchanged when no line fits" do
+    doc = PDF::Document.new
+    doc.page do |page|
+      input = [
+        {text: "-", styles: [:bold]},
+        {text: "  2", styles: [:bold]},
+        {text: "bbfoo", styles: [] of Symbol},
+      ]
+      remaining = page.formatted_text_box(input, at: {50, 700}, width: 79, height: 10)
+      remaining.map(&.[:text]).should eq(["-", "  2", "bbfoo"])
+      remaining.map(&.[:styles]).should eq([[:bold], [:bold], [] of Symbol])
+      # Rendering the remaining text again into a box that is too small must not change it.
+      again = page.formatted_text_box(remaining, at: {50, 700}, width: 79, height: 10)
+      again.map(&.[:text]).should eq(["-", "  2", "bbfoo"])
+    end
+  end
+
+  it "returns the cut line unchanged when it does not fit after a printed line" do
+    doc = PDF::Document.new
+    doc.page do |page|
+      remaining = page.formatted_text_box("first\n  indented <b>bold</b> end", at: {50, 700}, width: 400, height: 15)
+      remaining.map(&.[:text]).join.should eq("  indented bold end")
+    end
+  end
+
   it "keeps a blank line that does not fit" do
     doc = PDF::Document.new
     doc.page do |page|

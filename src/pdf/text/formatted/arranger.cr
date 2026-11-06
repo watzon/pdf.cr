@@ -31,10 +31,11 @@ module PDF
         # Whether the current line has been finalized.
         getter? finalized : Bool = false
 
-        # The newline that ended the current line. It is not printed, but
-        # `#repack_unretrieved` must restore it, or the line break is lost
-        # from the remaining text.
-        @line_newline : FragmentHash? = nil
+        # The unconsumed fragments when the current line started. Line
+        # wrapping changes the consumed copies (it strips, splits and drops
+        # text), so `#repack_unretrieved` restores this list instead.
+        # Consumed fragments are copies, so these hashes do not change.
+        @line_start_unconsumed = [] of FragmentHash
 
         def initialize
           @consumed = [] of FragmentHash
@@ -67,12 +68,13 @@ module PDF
               @unconsumed << new_hash
             end
           end
+          @line_start_unconsumed = @unconsumed.dup
         end
 
         # Prepares for processing a new line.
         def initialize_line : Nil
           @finalized = false
-          @line_newline = nil
+          @line_start_unconsumed = @unconsumed.dup
           @max_line_height = 0.0
           @max_descender = 0.0
           @max_ascender = 0.0
@@ -123,10 +125,7 @@ module PDF
         # Updates the last consumed fragment with the printed and remaining text.
         def update_last_string(printed : String, remaining : String) : Nil
           if printed.empty?
-            unless @consumed.empty?
-              popped = @consumed.pop
-              @line_newline = popped if popped[:text]? == "\n"
-            end
+            @consumed.pop unless @consumed.empty?
           else
             @consumed.last[:text] = printed unless @consumed.empty?
           end
@@ -210,15 +209,11 @@ module PDF
           @max_ascender = metrics[:ascender]
         end
 
-        # Repacks unconsumed fragments (used when line doesn't fit).
+        # Puts the fragments of the current line back, as they were when the
+        # line started (used when the line doesn't fit).
         def repack_unretrieved : Nil
-          new_unconsumed = @consumed.map do |hash|
-            hash.dup
-          end
-          @line_newline.try { |newline| new_unconsumed << newline }
-          @unconsumed = new_unconsumed + @unconsumed
+          @unconsumed = @line_start_unconsumed.dup
           @consumed.clear
-          @line_newline = nil
         end
 
         private def omit_trailing_whitespace : Nil
