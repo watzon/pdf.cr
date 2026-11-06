@@ -209,6 +209,21 @@ module PDF
           os2.try(&.descender) || hhea.descent
         end
 
+        # Get the line gap (in font units) that matches `ascender` and
+        # `descender`. With typographic metrics this is `sTypoLineGap`. The
+        # Windows metrics already include the gap, so only the part of the
+        # `hhea` line height that they do not cover is returned. Without an
+        # OS/2 table the `hhea` line gap is used.
+        def line_gap : Int32
+          os2_table = os2
+          return hhea.line_gap.to_i32 unless os2_table
+          return os2_table.s_typo_line_gap.to_i32 if os2_table.use_typo_metrics?
+
+          hhea_height = hhea.ascent.to_i32 - hhea.descent.to_i32 + hhea.line_gap.to_i32
+          win_height = os2_table.us_win_ascent.to_i32 + os2_table.us_win_descent.to_i32
+          Math.max(0, hhea_height - win_height)
+        end
+
         # Get the cap height (in font units)
         def cap_height : Int16
           os2.try(&.cap_height) || (ascender * 0.7).to_i16

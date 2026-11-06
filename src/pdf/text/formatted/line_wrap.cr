@@ -38,48 +38,15 @@ module PDF
         end
 
         # Tokenize a fragment string into segments suitable for line wrapping.
-        # Splits on whitespace boundaries and hyphens.
+        # Splits on whitespace boundaries and hyphens: a run of spaces and
+        # tabs is one token, and a hyphen ends the token before it. The
+        # tokens joined together are always equal to the fragment.
         def tokenize(fragment : String) : Array(String)
-          tokens = [] of String
-          current = String::Builder.new
-
-          fragment.each_char_with_index do |char, i|
-            if char == ' ' || char == '\t'
-              # Flush current token if any
-              unless current.empty?
-                tokens << current.to_s
-                current = String::Builder.new
-              end
-              # Collect consecutive whitespace
-              ws = String::Builder.new
-              ws << char
-              # Peek ahead for more whitespace
-              j = i + 1
-              while j < fragment.size
-                next_char = fragment[j]
-                if next_char == ' ' || next_char == '\t'
-                  ws << next_char
-                  j += 1
-                else
-                  break
-                end
-              end
-              tokens << ws.to_s if ws.@bytesize > 0
-            elsif char == '-'
-              current << char
-              tokens << current.to_s
-              current = String::Builder.new
-            else
-              current << char
-            end
-          end
-
-          unless current.empty?
-            tokens << current.to_s
-          end
-
-          tokens
+          fragment.scan(TOKEN_PATTERN).map(&.[0])
         end
+
+        # A run of spaces and tabs, a word that ends with a hyphen, or a word.
+        TOKEN_PATTERN = /[ \t]+|[^ \t-]*-|[^ \t-]+/
 
         # Wraps a single line of text. Returns the text that was placed on
         # this line. The arranger is updated with consumed/unconsumed state.
@@ -138,6 +105,7 @@ module PDF
                 end
                 @line_full = true
                 finish_fragment(fragment, arranger)
+                arranger.unconsume_trailing_word if word_continues?(segment, arranger)
                 return false
               end
             end
@@ -156,6 +124,18 @@ module PDF
                       end
           arranger.update_last_string(@fragment_output, remaining)
           @line_empty = false if !@fragment_output.empty?
+        end
+
+        # Whether a segment that does not fit on the line continues a word
+        # from the previous fragment (no space, tab or hyphen at the fragment
+        # boundary). Then the line must not break at the boundary.
+        private def word_continues?(segment : String, arranger : Arranger) : Bool
+          return false unless @fragment_output.empty?
+          return false if segment.starts_with?(' ') || segment.starts_with?('\t')
+
+          previous = arranger.consumed.last?.try(&.[:text].as(String))
+          return false if previous.nil? || previous.empty?
+          !previous.ends_with?(' ') && !previous.ends_with?('\t') && !previous.ends_with?('-')
         end
 
         private def initialize_line(*, width : Float64, arranger : Arranger) : Nil

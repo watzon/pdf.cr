@@ -42,6 +42,10 @@ module PDF
     # Font resources used on this page (name -> reference)
     @font_resources : Hash(String, Objects::Reference)
 
+    # Resource keys of the Type1 fonts (name -> key such as "F1"). Keys are
+    # assigned once, from the same sequence as the TrueType font keys.
+    @font_resource_keys = {} of String => String
+
     # TrueType font resources (font object -> resource data)
     @truetype_font_resources : Hash(Fonts::TrueTypeFont, TrueTypeFontResources)
 
@@ -112,6 +116,7 @@ module PDF
       font_obj = @document.font(name)
       unless @font_resources.has_key?(name)
         font_indirect = @document.register_object(font_obj.to_dictionary)
+        @font_resource_keys[name] = next_font_key
         @font_resources[name] = font_indirect.reference
       end
 
@@ -140,7 +145,7 @@ module PDF
 
     # Registers a TrueType font and creates all necessary PDF objects
     private def register_truetype_font(ttf_font : Fonts::TrueTypeFont) : Nil
-      key = "F#{@font_resources.size + @truetype_font_resources.size + 1}"
+      key = next_font_key
 
       # We defer actual object creation until finalization
       # For now, just record that this font is used with nil reference
@@ -1286,9 +1291,13 @@ module PDF
     end
 
     private def font_resource_key(font_name : String) : String
-      # Create a simple key like F1, F2, etc.
-      index = @font_resources.keys.index(font_name) || @font_resources.size
-      "F#{index + 1}"
+      @font_resource_keys[font_name]
+    end
+
+    # The key for the next font resource (F1, F2, ...). Type1 and TrueType
+    # fonts share the sequence, so a key is never used twice on a page.
+    private def next_font_key : String
+      "F#{@font_resources.size + @truetype_font_resources.size + 1}"
     end
 
     private def encode_text_string(text : String, font_name : String) : String
