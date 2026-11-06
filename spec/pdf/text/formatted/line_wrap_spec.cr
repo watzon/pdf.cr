@@ -39,6 +39,13 @@ describe PDF::Text::Formatted::LineWrap do
       tokens = lw.tokenize("")
       tokens.should be_empty
     end
+
+    it "keeps each run of spaces and tabs once" do
+      lw = PDF::Text::Formatted::LineWrap.new
+      tokens = lw.tokenize("a  b\t \tc--d ")
+      tokens.should eq(["a", "  ", "b", "\t \t", "c-", "-", "d", " "])
+      tokens.join.should eq("a  b\t \tc--d ")
+    end
   end
 
   describe "#wrap_line" do
