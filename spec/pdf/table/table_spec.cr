@@ -293,19 +293,30 @@ describe PDF::Table do
       doc = PDF::Document.new
       doc.page do |page|
         page.font("Helvetica", size: 10)
-        # The documented literal overload-resolves and normalizes. Its second
-        # row spans 3 columns, so 2 widths are rejected by validation.
+        # The literal from the Page#table doc comment.
+        table = page.table(
+          [
+            ["Header 1", "Header 2", "Header 3"],
+            ["Cell 1", {content: "Cell 2", colspan: 2}],
+          ],
+          at: {50, 700},
+          header: true,
+          column_widths: [100.0, 150.0, 150.0],
+        )
+        table.row_count.should eq(2)
+        table.column_count.should eq(3)
+      end
+    end
+
+    it "rejects column_widths that do not match the column count" do
+      doc = PDF::Document.new
+      doc.page do |page|
         expect_raises(ArgumentError, /3 columns/) do
           page.table(
             [["Header 1", "Header 2"], ["Cell 1", {content: "Cell 2", colspan: 2}]],
-            at: {50, 700}, header: true, column_widths: [100.0, 200.0],
+            at: {50, 700}, column_widths: [100.0, 200.0],
           )
         end
-        table = page.table(
-          [["Header 1", "Header 2"], ["Cell 1", {content: "Cell 2", colspan: 2}]],
-          at: {50, 700}, header: true, column_widths: [100.0, 100.0, 100.0],
-        )
-        table.row_count.should eq(2)
       end
     end
 

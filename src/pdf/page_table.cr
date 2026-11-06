@@ -5,12 +5,12 @@ module PDF
     # ```
     # page.table(
     #   [
-    #     ["Header 1", "Header 2"],
+    #     ["Header 1", "Header 2", "Header 3"],
     #     ["Cell 1", {content: "Cell 2", colspan: 2}],
     #   ],
     #   at: {50, 700},
     #   header: true,
-    #   column_widths: [100.0, 200.0],
+    #   column_widths: [100.0, 150.0, 150.0],
     # )
     # ```
     def table(
@@ -38,11 +38,11 @@ module PDF
       hash = {} of Symbol => String | Int32 | Float64 | Bool | Nil
       cell.each do |key, value|
         hash[key] = case value
-                           when Int then value.to_i32
-                           when Float then value.to_f64
-                           when String, Bool, Nil then value
-                           else value.to_s
-                           end
+                    when Int               then value.to_i32
+                    when Float             then value.to_f64
+                    when String, Bool, Nil then value
+                    else                        value.to_s
+                    end
       end
       hash
     end
