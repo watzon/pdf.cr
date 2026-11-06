@@ -226,6 +226,58 @@ pdf.page do |page|
 end
 ```
 
+### SVG
+
+`page.svg` draws an SVG document as vector graphics. `at` is the top-left
+corner on the page. Give `width`, `height` or both to scale it.
+
+```crystal
+pdf.page do |page|
+  page.svg(File.read("diagram.svg"), at: {72, 720}, width: 400)
+end
+```
+
+Supported:
+
+- Shapes: `rect` (with `rx` and `ry`), `circle`, `ellipse`, `line`,
+  `polyline`, `polygon` and `path` (all commands, including arcs).
+- Structure: `g`, `defs`, `use` (with `x` and `y`, and `symbol` or `svg`
+  targets), nested `svg` viewports, `viewBox`, `preserveAspectRatio`
+  (all alignments with `meet` or `slice`, and `none`) and `transform`.
+- Styling: presentation attributes, `style=""`, `<style>` sheets with
+  type, class, id and attribute selectors (ranked by specificity, with
+  `!important`), inheritance and `currentColor`.
+- Paint: colors, `linearGradient` and `radialGradient` (including
+  `stop-opacity`), `opacity`, `fill-opacity`, `stroke-opacity`,
+  `fill-rule`, `stroke-width`, `stroke-dasharray`, `stroke-dashoffset`,
+  `stroke-linecap`, `stroke-linejoin` and `stroke-miterlimit`.
+- `clipPath`, in user space or bounding-box units.
+- Text: `text` and `tspan` with `x`, `y`, `dx` and `dy`, `text-anchor`,
+  `font-size`, `font-weight`, `font-style` and `font-family`. Families map
+  to the standard 14 fonts (serif to Times, monospace to Courier, others
+  to Helvetica).
+
+This is a subset of SVG, not a full implementation. Known limits:
+
+- `opacity` on a group applies to each child shape on its own.
+- Gradient strokes and gradient text assume that the page has its default
+  transformation when you call `page.svg`.
+- `spreadMethod` reflect and repeat draw as pad.
+- Text uses only the standard 14 fonts (no embedded fonts), so characters
+  outside their encoding do not show. Text is filled but never stroked,
+  and `textPath`, `letter-spacing` and vertical text are not supported.
+- Text inside a `clipPath` is ignored. A clip path that holds only text
+  hides the clipped element.
+- CSS supports only the selectors listed above. Pseudo-classes, sibling
+  combinators and at-rules (`@media`, `@import`, `@font-face`) are ignored.
+- `image`, `mask`, `pattern`, `marker`, `filter`, `foreignObject` and
+  `textPath` are skipped, and the renderer records a warning
+  (`page.svg(...).warnings`).
+- To bound the work on hostile input, nested `use` references stop after
+  32 levels or 50,000 referenced elements (with a warning).
+
+See `examples/svg_demo.cr` for a sample of each feature.
+
 ### Multiple Pages
 
 ```crystal
@@ -277,6 +329,9 @@ The `PDF::Page` class represents a single page and provides a high-level DSL for
 - `move_to(x, y)` / `line_to(x, y)`: Path construction methods.
 - `stroke`, `fill`, `fill_stroke`: Path painting operations.
 - `save_graphics_state(&block)`: Saves the current graphics state, executes the block, and restores it.
+- `svg(data, at, width, height)`: Draws an SVG document and returns the `PDF::SVG::Renderer`.
+- `register_shading(dict)` / `shade(key)`: Registers a shading resource and paints it.
+- `register_pattern(dict)` / `fill_pattern(key)` / `stroke_pattern(key)`: Registers a pattern resource and uses it as paint.
 
 ## Maintainers
 

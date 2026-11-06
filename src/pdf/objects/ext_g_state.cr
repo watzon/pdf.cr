@@ -200,6 +200,7 @@ module PDF
         hash = hash &* 31 &+ (@line_cap.try(&.hash) || 0_u64)
         hash = hash &* 31 &+ (@line_join.try(&.hash) || 0_u64)
         hash = hash &* 31 &+ (@miter_limit.try(&.hash) || 0_u64)
+        hash = hash &* 31 &+ (@soft_mask.try(&.to_pdf.hash) || 0_u64)
         hash
       end
     end
