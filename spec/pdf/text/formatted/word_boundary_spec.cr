@@ -54,4 +54,19 @@ describe "line wrapping at style boundaries" do
       content.should match(/\/F\d+ 6\.996 Tf\n[^\n]*\n\(2\) Tj/) # superscript size 12 * 0.583
     end
   end
+
+  it "puts back the original fragments when a line with a moved word does not fit" do
+    doc = PDF::Document.new
+    doc.page do |page|
+      # Line 2 moves "bbcc" to line 3, then line 2 does not fit in the box.
+      remaining = page.formatted_text_box("aaaa\nx y <b>bb</b><i>cc</i> z",
+        at: {50, 700}, width: helvetica_width("x y bbc") + 0.5, height: 14)
+      remaining.map { |hash| {hash[:text], hash[:styles]} }.should eq([
+        {"x y ", [] of Symbol},
+        {"bb", [:bold]},
+        {"cc", [:italic]},
+        {" z", [] of Symbol},
+      ])
+    end
+  end
 end

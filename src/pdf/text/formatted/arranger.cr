@@ -31,11 +31,16 @@ module PDF
         # Whether the current line has been finalized.
         getter? finalized : Bool = false
 
-        # The unconsumed fragments when the current line started. Line
-        # wrapping changes the consumed copies (it strips, splits and drops
-        # text), so `#repack_unretrieved` restores this list instead.
+        # The unconsumed fragments that the current line took, unchanged.
+        # Line wrapping changes the consumed copies (it strips, splits and
+        # drops text), so `#repack_unretrieved` restores these instead.
         # Consumed fragments are copies, so these hashes do not change.
-        @line_start_unconsumed = [] of FragmentHash
+        @line_taken = [] of FragmentHash
+
+        # The number of fragments at the start of `@unconsumed` that the
+        # current line put back (the rest of a split fragment or a moved
+        # word). They come from `@line_taken`, so a repack removes them.
+        @line_put_back = 0
 
         def initialize
           @consumed = [] of FragmentHash
@@ -68,13 +73,13 @@ module PDF
               @unconsumed << new_hash
             end
           end
-          @line_start_unconsumed = @unconsumed.dup
         end
 
         # Prepares for processing a new line.
         def initialize_line : Nil
           @finalized = false
-          @line_start_unconsumed = @unconsumed.dup
+          @line_taken = [] of FragmentHash
+          @line_put_back = 0
           @max_line_height = 0.0
           @max_descender = 0.0
           @max_ascender = 0.0
@@ -100,6 +105,11 @@ module PDF
           return if @unconsumed.empty?
 
           hash = @unconsumed.shift
+          if @line_put_back > 0
+            @line_put_back -= 1
+          else
+            @line_taken << hash
+          end
           @consumed << hash.dup
           @current_format_state = FormatState.new(
             styles: hash[:styles]? ? hash[:styles].as(Array(Symbol)) : [] of Symbol,
@@ -134,6 +144,7 @@ module PDF
             remaining_hash = @current_format_state.to_hash
             remaining_hash[:text] = remaining
             @unconsumed.unshift(remaining_hash)
+            @line_put_back += 1
           end
         end
 
@@ -158,7 +169,8 @@ module PDF
             @consumed[index][:text] = text[0...cut]
           end
           @consumed = @consumed[0..index]
-          @unconsumed = moved + @unconsumed
+          moved.reverse_each { |hash| @unconsumed.unshift(hash) }
+          @line_put_back += moved.size
           true
         end
 
@@ -212,7 +224,10 @@ module PDF
         # Puts the fragments of the current line back, as they were when the
         # line started (used when the line doesn't fit).
         def repack_unretrieved : Nil
-          @unconsumed = @line_start_unconsumed.dup
+          @unconsumed.shift(@line_put_back)
+          @line_taken.reverse_each { |hash| @unconsumed.unshift(hash) }
+          @line_taken.clear
+          @line_put_back = 0
           @consumed.clear
         end
 
