@@ -84,7 +84,9 @@ module PDF
       def text(content : String, *, font_name : String = "Helvetica", font_size : Number = 12, align : Symbol = :left) : Nil
         abs_pos = @box.to_absolute({0.0, @box.height - @box.cursor})
         @page.font(font_name, size: font_size)
-        @page.text(content, at: {abs_pos[0], abs_pos[1]})
+        # The first baseline sits one ascender below the top of the line.
+        baseline = abs_pos[1] - font_size.to_f * Text::Formatted::FontMeasurer::ASCENDER_RATIO
+        @page.text(content, at: {abs_pos[0], baseline})
         # Move cursor down by line height
         @box.move_down(font_size.to_f * 1.2)
       end
@@ -96,10 +98,10 @@ module PDF
         align : Symbol = :left,
         leading : Number = 0,
         font_name : String = "Helvetica",
-        font_size : Number = 12
+        font_size : Number = 12,
       ) : Array(Text::Formatted::FragmentHash)
         abs_pos = @box.to_absolute({0.0, @box.height - @box.cursor})
-        remaining_height = @box.cursor
+        remaining_height = @box.available_height
 
         box = Text::Formatted::Box.new(
           formatted_text: fragments,
@@ -164,10 +166,17 @@ module PDF
 
       # Draws text at the current cursor position within the current column.
       def text(content : String, *, font_name : String = "Helvetica", font_size : Number = 12, align : Symbol = :left) : Nil
+        line_height = font_size.to_f * 1.2
+        # Move to the next column while the line does not fit. Draw nothing
+        # when the last column is full.
+        while line_height > @box.available_height
+          return if @box.advance_column
+        end
         abs_pos = @box.to_absolute({0.0, @box.height - @box.cursor})
         @page.font(font_name, size: font_size)
-        @page.text(content, at: {abs_pos[0], abs_pos[1]})
-        @box.move_down(font_size.to_f * 1.2)
+        baseline = abs_pos[1] - font_size.to_f * Text::Formatted::FontMeasurer::ASCENDER_RATIO
+        @page.text(content, at: {abs_pos[0], baseline})
+        @box.move_down(line_height)
       end
 
       # Draws formatted text within the current column. If text overflows,
@@ -178,15 +187,20 @@ module PDF
         align : Symbol = :left,
         leading : Number = 0,
         font_name : String = "Helvetica",
-        font_size : Number = 12
+        font_size : Number = 12,
       ) : Array(Text::Formatted::FragmentHash)
         remaining = fragments
 
         loop do
           abs_pos = @box.to_absolute({0.0, @box.height - @box.cursor})
-          remaining_height = @box.cursor
+          remaining_height = @box.available_height
 
-          break if remaining_height <= 0 || remaining.empty?
+          break if @box.full? || remaining.empty?
+
+          if remaining_height <= 0
+            break if @box.advance_column
+            next
+          end
 
           text_box = Text::Formatted::Box.new(
             formatted_text: remaining,

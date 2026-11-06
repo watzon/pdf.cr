@@ -39,6 +39,22 @@ describe PDF::Layout::BoundingBox do
     end
   end
 
+  describe "#available_height" do
+    it "equals the cursor for fixed boxes" do
+      box = PDF::Layout::BoundingBox.new(x: 50.0, y: 700.0, box_width: 200.0, fixed_height: 300.0)
+      box.move_down(50.0)
+      box.available_height.should eq(250.0)
+    end
+
+    it "is the distance to the page bottom for stretchy boxes" do
+      box = PDF::Layout::BoundingBox.new(x: 50.0, y: 700.0, box_width: 200.0)
+      box.cursor.should eq(0.0)
+      box.available_height.should eq(700.0)
+      box.move_down(100.0)
+      box.available_height.should eq(600.0)
+    end
+  end
+
   describe "#move_down" do
     it "updates the cursor position" do
       box = PDF::Layout::BoundingBox.new(

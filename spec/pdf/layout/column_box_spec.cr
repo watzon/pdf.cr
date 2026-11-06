@@ -57,10 +57,11 @@ describe PDF::Layout::ColumnBox do
       )
       box.add_left_padding(10.0)
       box.add_right_padding(10.0)
-      # box_width reduced by 20 -> 480
-      # bare_column_width = (480 - 20) / 2 = 230
-      # width = 230 - (10 + 10) = 210
-      box.width.should eq(210.0)
+      # padding does not change the overall width
+      # bare_column_width = (500 - 20) / 2 = 240
+      # width = 240 - (10 + 10) = 220
+      box.bare_column_width.should eq(240.0)
+      box.width.should eq(220.0)
     end
   end
 
@@ -135,15 +136,17 @@ describe PDF::Layout::ColumnBox do
       box.current_column.should eq(1)
     end
 
-    it "wraps around and signals new page needed" do
+    it "does not wrap around: marks the box full and signals new page needed" do
       box = PDF::Layout::ColumnBox.new(
         x: 50.0, y: 700.0, width: 500.0, height: 600.0,
         columns: 2, spacer: 20.0,
       )
-      box.advance_column  # column 0 -> 1
-      needs_new_page = box.advance_column  # column 1 -> 0 (wrap)
+      box.full?.should be_false
+      box.advance_column                  # column 0 -> 1
+      needs_new_page = box.advance_column # last column is full
       needs_new_page.should be_true
-      box.current_column.should eq(0)
+      box.full?.should be_true
+      box.current_column.should eq(1)
     end
 
     it "resets cursor on column advance" do
@@ -155,6 +158,26 @@ describe PDF::Layout::ColumnBox do
       box.cursor.should eq(500.0)
       box.advance_column
       box.cursor.should eq(600.0) # cursor reset to top
+    end
+  end
+
+  describe "indent" do
+    it "does not change the overall width and offsets left_side" do
+      box = PDF::Layout::ColumnBox.new(
+        x: 50.0, y: 700.0, width: 500.0, height: 600.0,
+        columns: 2, spacer: 12.0,
+      )
+      box.indent(20.0) do
+        box.bare_column_width.should eq(244.0)
+        box.width.should eq(224.0)
+        box.left_side.should eq(70.0)
+        box.right_side.should eq(294.0)
+        box.advance_column
+        box.left_side.should eq(70.0 + 256.0)
+        box.right_side.should eq(70.0 + 256.0 + 224.0)
+      end
+      box.width.should eq(244.0)
+      box.left_side.should eq(50.0 + 256.0)
     end
   end
 

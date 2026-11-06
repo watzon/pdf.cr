@@ -13,9 +13,9 @@ module PDF
     #   x: 50.0, y: 700.0,
     #   width: 400.0, height: 300.0,
     # )
-    # box.cursor        # => 300.0 (top of the box)
+    # box.cursor # => 300.0 (top of the box)
     # box.move_down(20)
-    # box.cursor        # => 280.0
+    # box.cursor # => 280.0
     # ```
     class BoundingBox
       # Absolute x-coordinate of the top-left corner
@@ -50,7 +50,7 @@ module PDF
         @y : Float64,
         @box_width : Float64,
         @fixed_height : Float64? = nil,
-        @parent : BoundingBox? = nil
+        @parent : BoundingBox? = nil,
       )
         @cursor_y = 0.0
         @stretched_height = 0.0
@@ -133,6 +133,17 @@ module PDF
       # Starts at `height` and decreases as content is added.
       def cursor : Float64
         height - @cursor_y
+      end
+
+      # Height available below the cursor for new content. For fixed boxes
+      # this is the `cursor`. Stretchy boxes grow as content is added, so
+      # the space is bounded by the page bottom (y = 0) instead.
+      def available_height : Float64
+        if stretchy?
+          Math.max(absolute_cursor_y, 0.0)
+        else
+          cursor
+        end
       end
 
       # Height of the bounding box. For stretchy boxes, this is

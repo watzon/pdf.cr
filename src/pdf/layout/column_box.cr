@@ -11,8 +11,8 @@ module PDF
     #   width: 500.0, height: 600.0,
     #   columns: 2, spacer: 12.0,
     # )
-    # col_box.column_width  # => 244.0
-    # col_box.current_column  # => 0
+    # col_box.column_width   # => 244.0
+    # col_box.current_column # => 0
     # ```
     class ColumnBox < BoundingBox
       # Number of columns
@@ -24,6 +24,9 @@ module PDF
       # Current column index (0-based)
       getter current_column : Int32 = 0
 
+      # True once the last column is full.
+      getter? full : Bool = false
+
       def initialize(
         x : Float64,
         y : Float64,
@@ -31,15 +34,33 @@ module PDF
         height : Float64? = nil,
         parent : BoundingBox? = nil,
         @columns : Int32 = 2,
-        @spacer : Float64 = 12.0
+        @spacer : Float64 = 12.0,
       )
         super(x: x, y: y, box_width: width, fixed_height: height, parent: parent)
         @current_column = 0
       end
 
-      # The bare column width before padding.
+      # The bare column width, before per-column padding.
       def bare_column_width : Float64
         (@box_width - (@spacer * (@columns - 1))) / @columns
+      end
+
+      # Padding does not change the overall width of a column box.
+      # It only narrows each column (see `width`).
+      def add_left_padding(padding : Float64) : Nil
+        @total_left_padding += padding
+      end
+
+      def add_right_padding(padding : Float64) : Nil
+        @total_right_padding += padding
+      end
+
+      def subtract_left_padding(padding : Float64) : Nil
+        @total_left_padding -= padding
+      end
+
+      def subtract_right_padding(padding : Float64) : Nil
+        @total_right_padding -= padding
       end
 
       # The column width after padding. Used for text line length.
@@ -52,9 +73,9 @@ module PDF
         bare_column_width + @spacer
       end
 
-      # Absolute left x-coordinate of the current column.
+      # Absolute left x-coordinate of the current column (after padding).
       def left_side : Float64
-        absolute_left + (width_of_column * @current_column)
+        absolute_left + (width_of_column * @current_column) + @total_left_padding
       end
 
       # Relative left position of the current column.
@@ -64,8 +85,7 @@ module PDF
 
       # Absolute right x-coordinate of the current column.
       def right_side : Float64
-        columns_from_right = @columns - (1 + @current_column)
-        absolute_right - (width_of_column * columns_from_right)
+        left_side + width
       end
 
       # Relative right position of the current column.
@@ -73,11 +93,17 @@ module PDF
         left + width
       end
 
-      # Advances to the next column. Returns true if a new page is needed.
+      # Advances to the next column. Returns true when the last column is
+      # already in use: the box is then marked `full?` and the caller must
+      # start a new page. The column index never wraps around.
       def advance_column : Bool
-        @current_column = (@current_column + 1) % @columns
+        if @current_column >= @columns - 1
+          @full = true
+          return true
+        end
+        @current_column += 1
         @cursor_y = 0.0
-        @current_column == 0 # true means we wrapped around -> new page needed
+        false
       end
 
       # Converts a relative point to absolute coordinates,
