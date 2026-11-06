@@ -141,26 +141,39 @@ module PDF
           {ids, classes, types}
         end
 
+        # Failed {part index, node} pairs are remembered for one call, so
+        # descendant combinators cost at most parts x depth checks instead
+        # of growing exponentially with the number of combinators.
         def matches?(node : XML::Node) : Bool
-          match_at(@parts.size - 1, node)
+          return @parts[0].matches?(node) if @parts.size == 1
+          match_at(@parts.size - 1, node, Set(Tuple(Int32, UInt64)).new)
         end
 
-        private def match_at(index : Int32, node : XML::Node) : Bool
+        private def match_at(index : Int32, node : XML::Node, failed : Set(Tuple(Int32, UInt64))) : Bool
+          key = {index, node.to_unsafe.address}
+          return false if failed.includes?(key)
+
+          matched = match_uncached(index, node, failed)
+          failed << key unless matched
+          matched
+        end
+
+        private def match_uncached(index : Int32, node : XML::Node, failed : Set(Tuple(Int32, UInt64))) : Bool
           return false unless @parts[index].matches?(node)
           return true if index == 0
 
           if @combinators[index - 1] == '>'
             parent = CSS.element_parent(node)
-            !parent.nil? && match_at(index - 1, parent)
+            !parent.nil? && match_at(index - 1, parent, failed)
           else
-            ancestor_matches?(index - 1, node)
+            ancestor_matches?(index - 1, node, failed)
           end
         end
 
-        private def ancestor_matches?(index : Int32, node : XML::Node) : Bool
+        private def ancestor_matches?(index : Int32, node : XML::Node, failed : Set(Tuple(Int32, UInt64))) : Bool
           ancestor = CSS.element_parent(node)
           while ancestor
-            return true if match_at(index, ancestor)
+            return true if match_at(index, ancestor, failed)
             ancestor = CSS.element_parent(ancestor)
           end
           false

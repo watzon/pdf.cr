@@ -375,7 +375,9 @@ describe "SVG stroke properties" do
 
   it "ignores dash arrays that are none, negative or all zero" do
     c = content_of(svg_doc(%(<line x2="1" stroke="red" stroke-dasharray="none"/><line x2="1" stroke="red" stroke-dasharray="3 -1"/><line x2="1" stroke="red" stroke-dasharray="0 0"/>)))
-    c.should_not contain(" d\n")
+    # Only the solid dash set by the root reset; no dash pattern.
+    c.scan(/ d\n/).size.should eq(1)
+    c.should contain("[] 0 d\n")
   end
 
   it "emits caps, joins and the miter limit, inherited from groups" do

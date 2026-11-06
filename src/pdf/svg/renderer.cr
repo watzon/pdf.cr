@@ -32,9 +32,11 @@ module PDF
     # Limits: group opacity is applied per shape (see `Style`); gradient
     # strokes and gradient text use shading patterns, whose matrix assumes
     # the page has its default transformation when `Page#svg` is called;
-    # spreadMethod reflect and repeat draw as pad; text is not stroked.
-    # Elements such as image, mask, pattern, marker and filter are skipped
-    # with a warning.
+    # spreadMethod reflect and repeat draw as pad; text is not stroked;
+    # text inside clipPath is ignored. Elements such as image, mask,
+    # pattern, marker and filter are skipped with a warning. Content
+    # reached through `use` is limited by MAX_USE_DEPTH and
+    # MAX_USE_ELEMENTS.
     #
     # Ported from Prawn::SVG::Renderer.
     class Renderer
@@ -52,6 +54,12 @@ module PDF
 
       # Upper bound on nested `use` references (guards against cycles).
       MAX_USE_DEPTH = 32
+
+      # Upper bound on the elements drawn or outlined through `use`
+      # references in one document. Nested `use` elements can multiply
+      # the content exponentially (each level referencing the previous
+      # one twice); copies beyond this budget are skipped with a warning.
+      MAX_USE_ELEMENTS = 50_000
 
       # The PDF page to draw on
       getter page : Page
@@ -82,6 +90,8 @@ module PDF
       @ctm_stack = [] of Transform::Matrix
       @viewports = [] of Tuple(Float64, Float64)
       @use_stack = [] of XML::Node
+      @outline_use_stack = [] of XML::Node
+      @use_elements = 0
 
       def initialize(
         @page : Page,
@@ -133,6 +143,7 @@ module PDF
         page.rectangle(@x, @y - @output_height, @output_width, @output_height)
         page.clip!
         concat(@root_matrix)
+        reset_line_state
         @viewports << @root_viewport
         style = Style.new.derive(declared(parser.root))
         parser.elements.each { |element| render_element(element, style) }
@@ -154,6 +165,7 @@ module PDF
 
       private def render_element(node : XML::Node, inherited : Style) : Nil
         return unless node.element?
+        return unless @use_stack.empty? || use_budget_available?
 
         tag = node.name
         return if NON_RENDERING.includes?(tag)
@@ -203,7 +215,7 @@ module PDF
       private def render_use(node : XML::Node, style : Style) : Nil
         target = href_target(node)
         return unless target
-        return if @use_stack.includes?(target) || @use_stack.size >= MAX_USE_DEPTH
+        return if circular_use?(node, target, @use_stack)
 
         @use_stack << target
         tx = length(node["x"]?, :x)
@@ -274,6 +286,30 @@ module PDF
         parts = value.strip.split(/[\s,]+/).compact_map(&.to_f?)
         return unless parts.size == 4 && parts[2] > 0 && parts[3] > 0
         {parts[0], parts[1], parts[2], parts[3]}
+      end
+
+      # True when `target` is the `use` element itself, one of its
+      # ancestors, or already being expanded: such a reference is an
+      # error in SVG and draws nothing.
+      private def circular_use?(use : XML::Node, target : XML::Node, active : Array(XML::Node)) : Bool
+        return true if active.includes?(target) || active.size >= MAX_USE_DEPTH
+
+        ancestor = use
+        while ancestor
+          return true if ancestor == target
+          ancestor = ancestor.parent
+        end
+        false
+      end
+
+      # Counts one element reached through `use`. Returns false, with a
+      # warning, once MAX_USE_ELEMENTS is used up.
+      private def use_budget_available? : Bool
+        @use_elements += 1
+        return true if @use_elements <= MAX_USE_ELEMENTS
+
+        warn("Too many elements drawn through use (limit #{MAX_USE_ELEMENTS}); the rest are skipped")
+        false
       end
 
       private def href_target(node : XML::Node) : XML::Node?
@@ -376,6 +412,7 @@ module PDF
       # for clip paths).
       private def outline(node : XML::Node, matrix : Transform::Matrix, depth : Int32 = 0) : Array(PathCommand)
         return [] of PathCommand unless node.element? && depth < MAX_USE_DEPTH
+        return [] of PathCommand unless @outline_use_stack.empty? || use_budget_available?
         return [] of PathCommand if declared(node)["display"]? == "none"
 
         content_outline(node, Transform.multiply(matrix, Transform.parse(node["transform"]?)), depth)
@@ -389,8 +426,12 @@ module PDF
           (commands = shape_geometry(node)) && result.concat(Geometry.transform(commands, matrix))
         elsif node.name == "use"
           target = href_target(node)
-          offset = {1.0, 0.0, 0.0, 1.0, length(node["x"]?, :x), length(node["y"]?, :y)}
-          result.concat(outline(target, Transform.multiply(matrix, offset), depth + 1)) if target
+          if target && !circular_use?(node, target, @outline_use_stack)
+            offset = {1.0, 0.0, 0.0, 1.0, length(node["x"]?, :x), length(node["y"]?, :y)}
+            @outline_use_stack << target
+            result.concat(outline(target, Transform.multiply(matrix, offset), depth + 1))
+            @outline_use_stack.pop
+          end
         elsif {"g", "a", "switch", "clipPath"}.includes?(node.name)
           node.children.each { |child| result.concat(outline(child, matrix, depth + 1)) }
         end
@@ -454,6 +495,17 @@ module PDF
       private def restore : Nil
         @ctm = @ctm_stack.pop
         page.restore_graphics_state
+      end
+
+      # Sets the SVG initial stroke values. The page may carry its own
+      # line width, cap, join, miter limit or dash from earlier drawing,
+      # and the PDF default miter limit (10) differs from the SVG one (4).
+      private def reset_line_state : Nil
+        page.line_width(1)
+        page.line_cap(:butt)
+        page.line_join(:miter)
+        page.miter_limit(4)
+        page.dash([] of Float64)
       end
 
       # Concatenates a matrix to the current transformation, tracking the

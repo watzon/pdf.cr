@@ -194,11 +194,24 @@ Supported:
   to the standard 14 fonts (serif to Times, monospace to Courier, others
   to Helvetica).
 
-Limits: `opacity` on a group applies to each child shape on its own.
-Gradient strokes and gradient text assume that the page has its default
-transformation when you call `page.svg`. `spreadMethod` reflect and
-repeat draw as pad. `image`, `mask`, `pattern`, `marker` and `filter`
-are skipped, and the renderer records a warning (`page.svg(...).warnings`).
+This is a subset of SVG, not a full implementation. Known limits:
+
+- `opacity` on a group applies to each child shape on its own.
+- Gradient strokes and gradient text assume that the page has its default
+  transformation when you call `page.svg`.
+- `spreadMethod` reflect and repeat draw as pad.
+- Text uses only the standard 14 fonts (no embedded fonts), so characters
+  outside their encoding do not show. Text is filled but never stroked,
+  and `textPath`, `letter-spacing` and vertical text are not supported.
+- Text inside a `clipPath` is ignored. A clip path that holds only text
+  hides the clipped element.
+- CSS supports only the selectors listed above. Pseudo-classes, sibling
+  combinators and at-rules (`@media`, `@import`, `@font-face`) are ignored.
+- `image`, `mask`, `pattern`, `marker`, `filter`, `foreignObject` and
+  `textPath` are skipped, and the renderer records a warning
+  (`page.svg(...).warnings`).
+- To bound the work on hostile input, nested `use` references stop after
+  32 levels or 50,000 referenced elements (with a warning).
 
 See `examples/svg_demo.cr` for a sample of each feature.
 
