@@ -27,6 +27,14 @@ module PDF
       # True once the last column is full.
       getter? full : Bool = false
 
+      # Offset from the top of the box where the columns of the current
+      # section start. It is 0 until a full-width span pushes it down.
+      getter column_top : Float64 = 0.0
+
+      # The largest cursor offset (from the top of the box) that any column
+      # of the current section has used. A span starts at this offset.
+      getter section_bottom : Float64 = 0.0
+
       def initialize(
         x : Float64,
         y : Float64,
@@ -102,8 +110,40 @@ module PDF
           return true
         end
         @current_column += 1
-        @cursor_y = 0.0
+        @cursor_y = @column_top
         false
+      end
+
+      def move_down(amount : Float64) : Nil
+        super
+        track_section_bottom
+      end
+
+      def move_to(relative_y : Float64) : Nil
+        super
+        track_section_bottom
+      end
+
+      # Starts a new section of columns at `offset` from the top of the box.
+      # All columns of the new section start at this offset, beginning with
+      # the first column. Used after a full-width span.
+      def start_section(offset : Float64) : Nil
+        @current_column = 0
+        @full = false
+        @column_top = offset
+        @section_bottom = offset
+        @cursor_y = offset
+        @stretched_height = Math.max(@stretched_height, offset) if stretchy?
+      end
+
+      # Resets the box for a new page: the first column, at the top of the
+      # box, with no sections. The box keeps its position and size.
+      def start_new_page : Nil
+        start_section(0.0)
+      end
+
+      private def track_section_bottom : Nil
+        @section_bottom = Math.max(@section_bottom, @cursor_y)
       end
 
       # Converts a relative point to absolute coordinates,

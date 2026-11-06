@@ -76,9 +76,17 @@ module PDF
     # end
     # ```
     def page(width : Number = 612, height : Number = 792, &) : Page
+      page = start_new_page(width, height)
+      yield page
+      page
+    end
+
+    # Appends a new empty page and returns it. Layout code uses this to
+    # continue content on the next page, for example when a column box
+    # is full.
+    def start_new_page(width : Number = 612, height : Number = 792) : Page
       page = Page.new(self, width.to_f, height.to_f)
       @pages << page
-      yield page
       page
     end
 

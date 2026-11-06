@@ -46,8 +46,9 @@ doc.page do |page|
     box.stroke_bounds
   end
 
-  # Two columns of flowing text.
-  page.column_box(at: {50, 590}, width: 510, height: 110, columns: 2, spacer: 20) do |col|
+  # Two columns of flowing text. The demo keeps to one page, so the text
+  # that does not fit is not continued on a new page.
+  page.column_box(at: {50, 590}, width: 510, height: 110, columns: 2, spacer: 20, page_break: false) do |col|
     col.formatted_text([{text: (LOREM + " ") * 3, styles: [] of Symbol}])
   end
 
