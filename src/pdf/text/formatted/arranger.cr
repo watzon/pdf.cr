@@ -31,6 +31,11 @@ module PDF
         # Whether the current line has been finalized.
         getter? finalized : Bool = false
 
+        # The newline that ended the current line. It is not printed, but
+        # `#repack_unretrieved` must restore it, or the line break is lost
+        # from the remaining text.
+        @line_newline : FragmentHash? = nil
+
         def initialize
           @consumed = [] of FragmentHash
           @unconsumed = [] of FragmentHash
@@ -67,6 +72,7 @@ module PDF
         # Prepares for processing a new line.
         def initialize_line : Nil
           @finalized = false
+          @line_newline = nil
           @max_line_height = 0.0
           @max_descender = 0.0
           @max_ascender = 0.0
@@ -117,7 +123,10 @@ module PDF
         # Updates the last consumed fragment with the printed and remaining text.
         def update_last_string(printed : String, remaining : String) : Nil
           if printed.empty?
-            @consumed.pop unless @consumed.empty?
+            unless @consumed.empty?
+              popped = @consumed.pop
+              @line_newline = popped if popped[:text]? == "\n"
+            end
           else
             @consumed.last[:text] = printed unless @consumed.empty?
           end
@@ -128,6 +137,34 @@ module PDF
             @unconsumed.unshift(remaining_hash)
           end
         end
+
+        # Moves the last word of the line back to the unconsumed text, so that
+        # it starts the next line. The word starts after the last space, tab
+        # or hyphen of the line and can span several fragments (for example
+        # `H` and a subscript `2`). Returns `false`, and changes nothing, when
+        # the line has no such break point before the word.
+        def unconsume_trailing_word : Bool
+          index = @consumed.rindex { |hash| BREAK_CHARACTER.matches?(hash[:text].as(String)) }
+          return false unless index
+
+          text = @consumed[index][:text].as(String)
+          cut = (text.rindex(BREAK_CHARACTER) || return false) + 1
+          return false if index == 0 && text[0...cut].blank?
+
+          moved = @consumed[(index + 1)..].map(&.dup)
+          if cut < text.size
+            tail = @consumed[index].dup
+            tail[:text] = text[cut..]
+            moved.unshift(tail)
+            @consumed[index][:text] = text[0...cut]
+          end
+          @consumed = @consumed[0..index]
+          @unconsumed = moved + @unconsumed
+          true
+        end
+
+        # A character after which a line can break.
+        BREAK_CHARACTER = /[ \t-]/
 
         # Finalizes the current line by creating Fragment objects from
         # consumed hashes and measuring them.
@@ -178,8 +215,10 @@ module PDF
           new_unconsumed = @consumed.map do |hash|
             hash.dup
           end
+          @line_newline.try { |newline| new_unconsumed << newline }
           @unconsumed = new_unconsumed + @unconsumed
           @consumed.clear
+          @line_newline = nil
         end
 
         private def omit_trailing_whitespace : Nil
@@ -207,6 +246,24 @@ module PDF
       # Integer and Float32 values become Float64.
       def self.to_fragment_hashes(fragments : Array) : Array(FragmentHash)
         fragments.map { |fragment| to_fragment_hash(fragment.to_h) }
+      end
+
+      # Converts formatted text input to `FragmentHash` values: a markup
+      # string is parsed with `Parser.format`, fragment hashes are returned
+      # as they are, and other arrays (named tuples) use
+      # `to_fragment_hashes`.
+      def self.coerce(fragments : String) : Array(FragmentHash)
+        Parser.format(fragments)
+      end
+
+      # :ditto:
+      def self.coerce(fragments : Array(FragmentHash)) : Array(FragmentHash)
+        fragments
+      end
+
+      # :ditto:
+      def self.coerce(fragments : Array) : Array(FragmentHash)
+        to_fragment_hashes(fragments)
       end
 
       private def self.to_fragment_hash(source : Hash) : FragmentHash

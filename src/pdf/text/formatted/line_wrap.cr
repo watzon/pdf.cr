@@ -138,6 +138,7 @@ module PDF
                 end
                 @line_full = true
                 finish_fragment(fragment, arranger)
+                arranger.unconsume_trailing_word if word_continues?(segment, arranger)
                 return false
               end
             end
@@ -156,6 +157,18 @@ module PDF
                       end
           arranger.update_last_string(@fragment_output, remaining)
           @line_empty = false if !@fragment_output.empty?
+        end
+
+        # Whether a segment that does not fit on the line continues a word
+        # from the previous fragment (no space, tab or hyphen at the fragment
+        # boundary). Then the line must not break at the boundary.
+        private def word_continues?(segment : String, arranger : Arranger) : Bool
+          return false unless @fragment_output.empty?
+          return false if segment.starts_with?(' ') || segment.starts_with?('\t')
+
+          previous = arranger.consumed.last?.try(&.[:text].as(String))
+          return false if previous.nil? || previous.empty?
+          !previous.ends_with?(' ') && !previous.ends_with?('\t') && !previous.ends_with?('-')
         end
 
         private def initialize_line(*, width : Float64, arranger : Arranger) : Nil
