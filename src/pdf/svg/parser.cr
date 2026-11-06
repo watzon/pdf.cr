@@ -65,6 +65,19 @@ module PDF
         nil
       end
 
+      # Unit suffixes with their conversion to user units. Order matters
+      # only for suffixes that end with each other (none do).
+      LENGTH_UNITS = {
+        "px" => ->(v : Float64, _ref : Float64) { v },
+        "pt" => ->(v : Float64, _ref : Float64) { v },
+        "pc" => ->(v : Float64, _ref : Float64) { v * 12.0 },
+        "mm" => ->(v : Float64, _ref : Float64) { v * 2.83465 },
+        "cm" => ->(v : Float64, _ref : Float64) { v * 28.3465 },
+        "in" => ->(v : Float64, _ref : Float64) { v * 72.0 },
+        "em" => ->(v : Float64, _ref : Float64) { v * 16.0 }, # approximate
+        "%"  => ->(v : Float64, ref : Float64) { v / 100.0 * ref },
+      }
+
       # Parses a CSS length value (e.g., "100px", "50%", "10em", "5cm").
       # Returns the value in user units (approximately points for PDF).
       def self.parse_length(value : String?, reference : Float64 = 0.0) : Float64?
@@ -72,31 +85,9 @@ module PDF
         value = value.strip
         return if value.empty?
 
-        if value.ends_with?("px")
-          value.rchop("px").to_f?
-        elsif value.ends_with?("pt")
-          value.rchop("pt").to_f?
-        elsif value.ends_with?("pc")
-          v = value.rchop("pc").to_f?
-          v ? v * 12.0 : nil
-        elsif value.ends_with?("mm")
-          v = value.rchop("mm").to_f?
-          v ? v * 2.83465 : nil
-        elsif value.ends_with?("cm")
-          v = value.rchop("cm").to_f?
-          v ? v * 28.3465 : nil
-        elsif value.ends_with?("in")
-          v = value.rchop("in").to_f?
-          v ? v * 72.0 : nil
-        elsif value.ends_with?("em")
-          v = value.rchop("em").to_f?
-          v ? v * 16.0 : nil # approximate
-        elsif value.ends_with?("%")
-          v = value.rchop("%").to_f?
-          v ? v / 100.0 * reference : nil
-        else
-          value.to_f?
-        end
+        unit, factor = LENGTH_UNITS.find { |suffix, _| value.ends_with?(suffix) } || return value.to_f?
+        number = value.rchop(unit).to_f?
+        number ? factor.call(number, reference) : nil
       end
 
       private def parse_length(value : String?, reference : Float64 = 0.0) : Float64?

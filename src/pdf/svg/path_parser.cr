@@ -53,37 +53,41 @@ module PDF
 
         def read_number : Float64?
           skip_separators
-          start = @pos
-          i = @pos
-          i += 1 if i < @data.size && (@data[i] == '-' || @data[i] == '+')
-          int_start = i
-          while i < @data.size && @data[i].ascii_number?
-            i += 1
-          end
-          digits = i - int_start
+          i = skip_sign(@pos)
+          int_end = scan_digits(i)
+          digits = int_end - i
+          i = int_end
           if i < @data.size && @data[i] == '.'
-            i += 1
-            frac_start = i
-            while i < @data.size && @data[i].ascii_number?
-              i += 1
-            end
-            digits += i - frac_start
+            frac_end = scan_digits(i + 1)
+            digits += frac_end - (i + 1)
+            i = frac_end
           end
           return if digits == 0
-          if i < @data.size && (@data[i] == 'e' || @data[i] == 'E')
-            j = i + 1
-            j += 1 if j < @data.size && (@data[j] == '-' || @data[j] == '+')
-            if j < @data.size && @data[j].ascii_number?
-              while j < @data.size && @data[j].ascii_number?
-                j += 1
-              end
-              i = j
-            end
-          end
-          value = @data[start...i].to_f?
+          i = scan_exponent(i)
+          value = @data[@pos...i].to_f?
           return unless value
           @pos = i
           value
+        end
+
+        private def skip_sign(i : Int32) : Int32
+          i < @data.size && (@data[i] == '-' || @data[i] == '+') ? i + 1 : i
+        end
+
+        private def scan_digits(i : Int32) : Int32
+          while i < @data.size && @data[i].ascii_number?
+            i += 1
+          end
+          i
+        end
+
+        # Returns the index after an exponent starting at `i`, or `i` itself
+        # when there is no complete exponent.
+        private def scan_exponent(i : Int32) : Int32
+          return i unless i < @data.size && (@data[i] == 'e' || @data[i] == 'E')
+          j = skip_sign(i + 1)
+          return i unless j < @data.size && @data[j].ascii_number?
+          scan_digits(j)
         end
 
         # Arc flags are a single '0' or '1' and may touch the next number.
@@ -103,131 +107,156 @@ module PDF
         'S' => 4, 'Q' => 4, 'T' => 2, 'A' => 7,
       }
 
+      # Per-path state: current point, subpath start, the previous curve
+      # control points (for S and T) and the emitted commands.
+      private class Builder
+        getter commands = [] of PathCommand
+        @cx = 0.0
+        @cy = 0.0
+        @start_x = 0.0
+        @start_y = 0.0
+        @prev_cubic : Tuple(Float64, Float64)? = nil
+        @prev_quad : Tuple(Float64, Float64)? = nil
+
+        def close : Nil
+          @commands << PathCommand.new('Z')
+          @cx = @start_x
+          @cy = @start_y
+          @prev_cubic = nil
+          @prev_quad = nil
+        end
+
+        def move_to(args : Array(Float64), relative : Bool) : Nil
+          x, y = target(args[0], args[1], relative)
+          @commands << PathCommand.new('M', [x, y])
+          @start_x, @start_y = x, y
+          finish(x, y)
+        end
+
+        def line_to(args : Array(Float64), relative : Bool) : Nil
+          x, y = target(args[0], args[1], relative)
+          @commands << PathCommand.new('L', [x, y])
+          finish(x, y)
+        end
+
+        def horizontal(args : Array(Float64), relative : Bool) : Nil
+          x = relative ? args[0] + @cx : args[0]
+          @commands << PathCommand.new('L', [x, @cy])
+          finish(x, @cy)
+        end
+
+        def vertical(args : Array(Float64), relative : Bool) : Nil
+          y = relative ? args[0] + @cy : args[0]
+          @commands << PathCommand.new('L', [@cx, y])
+          finish(@cx, y)
+        end
+
+        def cubic(args : Array(Float64), relative : Bool, smooth : Bool) : Nil
+          if smooth
+            x1, y1 = reflect(@prev_cubic)
+            x2, y2 = target(args[0], args[1], relative)
+            x, y = target(args[2], args[3], relative)
+          else
+            x1, y1 = target(args[0], args[1], relative)
+            x2, y2 = target(args[2], args[3], relative)
+            x, y = target(args[4], args[5], relative)
+          end
+          @commands << PathCommand.new('C', [x1, y1, x2, y2, x, y])
+          finish(x, y, cubic: {x2, y2})
+        end
+
+        def quadratic(args : Array(Float64), relative : Bool, smooth : Bool) : Nil
+          if smooth
+            qx, qy = reflect(@prev_quad)
+            x, y = target(args[0], args[1], relative)
+          else
+            qx, qy = target(args[0], args[1], relative)
+            x, y = target(args[2], args[3], relative)
+          end
+          @commands << PathCommand.new('C', [
+            @cx + 2.0/3.0 * (qx - @cx), @cy + 2.0/3.0 * (qy - @cy),
+            x + 2.0/3.0 * (qx - x), y + 2.0/3.0 * (qy - y), x, y,
+          ])
+          finish(x, y, quad: {qx, qy})
+        end
+
+        def arc(args : Array(Float64), relative : Bool) : Nil
+          x, y = target(args[5], args[6], relative)
+          PathParser.arc_to_curves(@cx, @cy, args[0], args[1], args[2], args[3] != 0.0, args[4] != 0.0, x, y, @commands)
+          finish(x, y)
+        end
+
+        # Resolves a coordinate pair against the current point.
+        private def target(x : Float64, y : Float64, relative : Bool) : Tuple(Float64, Float64)
+          relative ? {x + @cx, y + @cy} : {x, y}
+        end
+
+        # Reflects the previous control point about the current point, or
+        # returns the current point when there is none.
+        private def reflect(prev : Tuple(Float64, Float64)?) : Tuple(Float64, Float64)
+          prev ? {2 * @cx - prev[0], 2 * @cy - prev[1]} : {@cx, @cy}
+        end
+
+        private def finish(x : Float64, y : Float64, cubic : Tuple(Float64, Float64)? = nil, quad : Tuple(Float64, Float64)? = nil) : Nil
+          @cx, @cy = x, y
+          @prev_cubic = cubic
+          @prev_quad = quad
+        end
+      end
+
       # Parses a path data string into an array of absolute PathCommands.
       def self.parse(data : String) : Array(PathCommand)
-        commands = [] of PathCommand
+        builder = Builder.new
         scanner = Scanner.new(data)
-
-        cx = 0.0
-        cy = 0.0
-        start_x = 0.0
-        start_y = 0.0
-        prev_cubic : Tuple(Float64, Float64)? = nil
-        prev_quad : Tuple(Float64, Float64)? = nil
         cmd : Char? = nil
 
         until scanner.eof?
-          c = scanner.peek
-          if c.letter?
-            up = c.upcase
-            break unless up == 'Z' || ARITY.has_key?(up)
-            cmd = c
-            scanner.advance
-          else
-            # Implicit repeat of the previous command. Not allowed after Z.
-            break if cmd.nil? || cmd.upcase == 'Z'
-            break unless scanner.number_start?
-          end
-
-          letter = cmd || break
+          letter = next_command(scanner, cmd) || break
+          cmd = letter
           up = letter.upcase
           relative = letter.lowercase?
 
           if up == 'Z'
-            commands << PathCommand.new('Z')
-            cx = start_x
-            cy = start_y
-            prev_cubic = nil
-            prev_quad = nil
+            builder.close
             next
           end
 
           args = read_args(scanner, up) || break
-          new_cubic : Tuple(Float64, Float64)? = nil
-          new_quad : Tuple(Float64, Float64)? = nil
-
-          case up
-          when 'M'
-            x, y = args[0], args[1]
-            x += cx if relative
-            y += cy if relative
-            commands << PathCommand.new('M', [x, y])
-            cx, cy = x, y
-            start_x, start_y = x, y
-            cmd = relative ? 'l' : 'L'
-          when 'L'
-            x, y = args[0], args[1]
-            x += cx if relative
-            y += cy if relative
-            commands << PathCommand.new('L', [x, y])
-            cx, cy = x, y
-          when 'H'
-            x = relative ? args[0] + cx : args[0]
-            commands << PathCommand.new('L', [x, cy])
-            cx = x
-          when 'V'
-            y = relative ? args[0] + cy : args[0]
-            commands << PathCommand.new('L', [cx, y])
-            cy = y
-          when 'C', 'S'
-            if up == 'C'
-              x1, y1, x2, y2, x, y = args[0], args[1], args[2], args[3], args[4], args[5]
-              if relative
-                x1 += cx; y1 += cy
-              end
-            else
-              x2, y2, x, y = args[0], args[1], args[2], args[3]
-              if pc = prev_cubic
-                x1 = 2 * cx - pc[0]
-                y1 = 2 * cy - pc[1]
-              else
-                x1, y1 = cx, cy
-              end
-            end
-            if relative
-              x2 += cx; y2 += cy
-              x += cx; y += cy
-            end
-            commands << PathCommand.new('C', [x1, y1, x2, y2, x, y])
-            new_cubic = {x2, y2}
-            cx, cy = x, y
-          when 'Q', 'T'
-            if up == 'Q'
-              qx, qy, x, y = args[0], args[1], args[2], args[3]
-              if relative
-                qx += cx; qy += cy
-              end
-            else
-              x, y = args[0], args[1]
-              if pq = prev_quad
-                qx = 2 * cx - pq[0]
-                qy = 2 * cy - pq[1]
-              else
-                qx, qy = cx, cy
-              end
-            end
-            if relative
-              x += cx; y += cy
-            end
-            commands << PathCommand.new('C', [
-              cx + 2.0/3.0 * (qx - cx), cy + 2.0/3.0 * (qy - cy),
-              x + 2.0/3.0 * (qx - x), y + 2.0/3.0 * (qy - y), x, y,
-            ])
-            new_quad = {qx, qy}
-            cx, cy = x, y
-          when 'A'
-            x, y = args[5], args[6]
-            x += cx if relative
-            y += cy if relative
-            arc_to_curves(cx, cy, args[0], args[1], args[2], args[3] != 0.0, args[4] != 0.0, x, y, commands)
-            cx, cy = x, y
-          end
-
-          prev_cubic = new_cubic
-          prev_quad = new_quad
+          dispatch(builder, up, relative, args)
+          cmd = relative ? 'l' : 'L' if up == 'M'
         end
 
-        commands
+        builder.commands
+      end
+
+      # Reads the next command letter, or returns the previous command for an
+      # implicit repeat. Returns nil when parsing must stop.
+      private def self.next_command(scanner : Scanner, previous : Char?) : Char?
+        c = scanner.peek
+        if c.letter?
+          up = c.upcase
+          return unless up == 'Z' || ARITY.has_key?(up)
+          scanner.advance
+          c
+        else
+          # Implicit repeat of the previous command. Not allowed after Z.
+          return if previous.nil? || previous.upcase == 'Z'
+          previous if scanner.number_start?
+        end
+      end
+
+      private def self.dispatch(builder : Builder, up : Char, relative : Bool, args : Array(Float64)) : Nil
+        case up
+        when 'M' then builder.move_to(args, relative)
+        when 'L' then builder.line_to(args, relative)
+        when 'H' then builder.horizontal(args, relative)
+        when 'V' then builder.vertical(args, relative)
+        when 'C' then builder.cubic(args, relative, smooth: false)
+        when 'S' then builder.cubic(args, relative, smooth: true)
+        when 'Q' then builder.quadratic(args, relative, smooth: false)
+        when 'T' then builder.quadratic(args, relative, smooth: true)
+        when 'A' then builder.arc(args, relative)
+        end
       end
 
       private def self.read_args(scanner : Scanner, up : Char) : Array(Float64)?
@@ -244,7 +273,8 @@ module PDF
 
       # Appends the cubic approximation of an SVG elliptical arc
       # (SVG 1.1 implementation notes F.6.5 and F.6.6).
-      private def self.arc_to_curves(
+      # :nodoc:
+      def self.arc_to_curves(
         x1 : Float64, y1 : Float64, rx : Float64, ry : Float64, phi_deg : Float64,
         large_arc : Bool, sweep : Bool, x2 : Float64, y2 : Float64,
         commands : Array(PathCommand),
@@ -266,21 +296,8 @@ module PDF
         x1p = cos_phi * dx + sin_phi * dy
         y1p = -sin_phi * dx + cos_phi * dy
 
-        lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry)
-        if lambda > 1.0
-          scale = Math.sqrt(lambda)
-          rx *= scale
-          ry *= scale
-        end
-
-        rx2 = rx * rx
-        ry2 = ry * ry
-        num = rx2 * ry2 - rx2 * y1p * y1p - ry2 * x1p * x1p
-        den = rx2 * y1p * y1p + ry2 * x1p * x1p
-        coef = den == 0.0 ? 0.0 : Math.sqrt({num / den, 0.0}.max)
-        coef = -coef if large_arc == sweep
-        cxp = coef * (rx * y1p / ry)
-        cyp = coef * -(ry * x1p / rx)
+        rx, ry = scale_radii(rx, ry, x1p, y1p)
+        cxp, cyp = arc_center_offset(rx, ry, x1p, y1p, large_arc == sweep)
 
         center_x = cos_phi * cxp - sin_phi * cyp + (x1 + x2) / 2.0
         center_y = sin_phi * cxp + cos_phi * cyp + (y1 + y2) / 2.0
@@ -291,8 +308,7 @@ module PDF
         dtheta -= 2 * Math::PI if !sweep && dtheta > 0
         dtheta += 2 * Math::PI if sweep && dtheta < 0
 
-        segments = (dtheta.abs / (Math::PI / 2) - 1e-9).ceil.to_i
-        segments = 1 if segments < 1
+        segments = {(dtheta.abs / (Math::PI / 2) - 1e-9).ceil.to_i, 1}.max
         delta = dtheta / segments
         t = 4.0 / 3.0 * Math.tan(delta / 4.0)
 
@@ -318,6 +334,26 @@ module PDF
             p2[0] - t * d2[0], p2[1] - t * d2[1], ex, ey,
           ])
         end
+      end
+
+      # Scales the radii up when they are too small to span the endpoints.
+      private def self.scale_radii(rx : Float64, ry : Float64, x1p : Float64, y1p : Float64) : Tuple(Float64, Float64)
+        lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry)
+        return {rx, ry} unless lambda > 1.0
+        scale = Math.sqrt(lambda)
+        {rx * scale, ry * scale}
+      end
+
+      # Center of the arc in the rotated frame (F.6.5.2). `negate` is true
+      # when the large-arc and sweep flags are equal.
+      private def self.arc_center_offset(rx : Float64, ry : Float64, x1p : Float64, y1p : Float64, negate : Bool) : Tuple(Float64, Float64)
+        rx2 = rx * rx
+        ry2 = ry * ry
+        num = rx2 * ry2 - rx2 * y1p * y1p - ry2 * x1p * x1p
+        den = rx2 * y1p * y1p + ry2 * x1p * x1p
+        coef = den == 0.0 ? 0.0 : Math.sqrt({num / den, 0.0}.max)
+        coef = -coef if negate
+        {coef * (rx * y1p / ry), coef * -(ry * x1p / rx)}
       end
     end
   end
