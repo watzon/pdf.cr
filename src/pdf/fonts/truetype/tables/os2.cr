@@ -276,23 +276,27 @@ module PDF
             write_uint16(io, @us_win_ascent)
             write_uint16(io, @us_win_descent)
 
-            if @version >= 1
-              write_uint32(io, @ul_code_page_range1 || 0_u32)
-              write_uint32(io, @ul_code_page_range2 || 0_u32)
-            end
+            write_version1_fields(io) if @version >= 1
+            write_version2_fields(io) if @version >= 2
+            write_version5_fields(io) if @version >= 5
+          end
 
-            if @version >= 2
-              write_int16(io, @sx_height || 0_i16)
-              write_int16(io, @s_cap_height || 0_i16)
-              write_uint16(io, @us_default_char || 0_u16)
-              write_uint16(io, @us_break_char || 0_u16)
-              write_uint16(io, @us_max_context || 0_u16)
-            end
+          private def write_version1_fields(io : IO) : Nil
+            write_uint32(io, @ul_code_page_range1 || 0_u32)
+            write_uint32(io, @ul_code_page_range2 || 0_u32)
+          end
 
-            if @version >= 5
-              write_uint16(io, @us_lower_optical_point_size || 0_u16)
-              write_uint16(io, @us_upper_optical_point_size || 0_u16)
-            end
+          private def write_version2_fields(io : IO) : Nil
+            write_int16(io, @sx_height || 0_i16)
+            write_int16(io, @s_cap_height || 0_i16)
+            write_uint16(io, @us_default_char || 0_u16)
+            write_uint16(io, @us_break_char || 0_u16)
+            write_uint16(io, @us_max_context || 0_u16)
+          end
+
+          private def write_version5_fields(io : IO) : Nil
+            write_uint16(io, @us_lower_optical_point_size || 0_u16)
+            write_uint16(io, @us_upper_optical_point_size || 0_u16)
           end
 
           extend IOHelpers

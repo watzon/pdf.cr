@@ -308,7 +308,6 @@ describe PDF::Fonts::TrueTypeFont do
       stream = font.font_file_stream
 
       # Encoded data should be smaller than or equal to original
-      original_length = font.subset_data.size
       encoded = stream.encoded_data
 
       # For compressible data, encoded should generally be smaller

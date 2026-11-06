@@ -125,19 +125,22 @@ module PDF
 
             return if @version == 0x00005000_u32
 
-            write_uint16(io, @max_points.not_nil!)
-            write_uint16(io, @max_contours.not_nil!)
-            write_uint16(io, @max_composite_points.not_nil!)
-            write_uint16(io, @max_composite_contours.not_nil!)
-            write_uint16(io, @max_zones.not_nil!)
-            write_uint16(io, @max_twilight_points.not_nil!)
-            write_uint16(io, @max_storage.not_nil!)
-            write_uint16(io, @max_function_defs.not_nil!)
-            write_uint16(io, @max_instruction_defs.not_nil!)
-            write_uint16(io, @max_stack_elements.not_nil!)
-            write_uint16(io, @max_size_of_instructions.not_nil!)
-            write_uint16(io, @max_component_elements.not_nil!)
-            write_uint16(io, @max_component_depth.not_nil!)
+            limits = {
+              @max_points,
+              @max_contours,
+              @max_composite_points,
+              @max_composite_contours,
+              @max_zones,
+              @max_twilight_points,
+              @max_storage,
+              @max_function_defs,
+              @max_instruction_defs,
+              @max_stack_elements,
+              @max_size_of_instructions,
+              @max_component_elements,
+              @max_component_depth,
+            }
+            limits.each { |limit| write_uint16(io, limit || raise "maxp table is missing TrueType limits") }
           end
 
           # Check if this is a TrueType font (version 1.0)

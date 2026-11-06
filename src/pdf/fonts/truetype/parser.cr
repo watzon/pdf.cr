@@ -95,11 +95,11 @@ module PDF
         # Get raw table data
         def table_data(tag : String) : Bytes?
           record = @table_records[tag]?
-          return nil unless record
+          return unless record
 
           start_offset = record.offset.to_i
           end_offset = start_offset + record.length.to_i
-          return nil if end_offset > @data.size
+          return if end_offset > @data.size
 
           @data[start_offset...end_offset]
         end

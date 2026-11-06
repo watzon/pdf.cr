@@ -97,9 +97,6 @@ module PDF
               parse_format6(io)
             when 12
               parse_format12(io)
-            else
-              # Unsupported format, skip
-              nil
             end
           end
 
@@ -118,7 +115,7 @@ module PDF
 
           # Format 4: Segment mapping to delta values (BMP Unicode)
           private def self.parse_format4(io : IO, raw_data : Bytes, table_offset : UInt32) : Hash(UInt32, UInt16)
-            length = read_uint16(io)
+            _length = read_uint16(io)
             _language = read_uint16(io)
             seg_count_x2 = read_uint16(io)
             seg_count = seg_count_x2 // 2
@@ -279,7 +276,7 @@ module PDF
             else
               # Merge all subtables
               result = Hash(UInt32, UInt16).new
-              @subtables.each_value { |m| result.merge!(m) }
+              @subtables.each_value { |table_map| result.merge!(table_map) }
               result
             end
           end
@@ -343,7 +340,7 @@ module PDF
             range_shift = seg_count_x2 - search_range
 
             # Calculate length
-            glyph_id_array_size = segments.sum { |s| s[:glyph_ids].size * 2 }
+            glyph_id_array_size = segments.sum { |segment| segment[:glyph_ids].size * 2 }
             length = 16 + (seg_count * 8) + glyph_id_array_size
 
             write_uint16(io, 4_u16) # format
@@ -355,23 +352,23 @@ module PDF
             write_uint16(io, range_shift.to_u16)
 
             # End codes
-            segments.each { |s| write_uint16(io, s[:end_code].to_u16) }
+            segments.each { |segment| write_uint16(io, segment[:end_code].to_u16) }
             write_uint16(io, 0_u16) # reservedPad
 
             # Start codes
-            segments.each { |s| write_uint16(io, s[:start_code].to_u16) }
+            segments.each { |segment| write_uint16(io, segment[:start_code].to_u16) }
 
             # ID deltas (mod 65536 to handle overflow, then wrap to signed Int16)
-            segments.each do |s|
+            segments.each do |segment|
               # The delta is computed modulo 65536 since glyph IDs are 16-bit
-              delta_mod = s[:id_delta] & 0xFFFF
+              delta_mod = segment[:id_delta] & 0xFFFF
               write_int16(io, delta_mod.to_i16!)
             end
 
             # ID range offsets
             offset = segments.size * 2 # Offset from current position to glyphIdArray
-            segments.each_with_index do |s, i|
-              if s[:use_delta]
+            segments.each_with_index do |segment, i|
+              if segment[:use_delta]
                 write_uint16(io, 0_u16)
               else
                 # Calculate offset to this segment's glyph IDs
@@ -382,8 +379,8 @@ module PDF
             end
 
             # Glyph ID array
-            segments.each do |s|
-              s[:glyph_ids].each { |id| write_uint16(io, id) }
+            segments.each do |segment|
+              segment[:glyph_ids].each { |id| write_uint16(io, id) }
             end
           end
 

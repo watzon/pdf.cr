@@ -249,7 +249,6 @@ module PDF
             loop do
               break if io.pos + 4 > data.size
 
-              flags_pos = io.pos
               flags = read_uint16(io)
               old_glyph_id = read_uint16(io)
 

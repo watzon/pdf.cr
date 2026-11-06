@@ -6,7 +6,7 @@ module PDF
       module IOHelpers
         # Read an unsigned 8-bit integer
         def read_uint8(io : IO) : UInt8
-          io.read_byte.not_nil!
+          io.read_byte || raise IO::EOFError.new("Unexpected end of data while reading uint8")
         end
 
         # Read a signed 8-bit integer

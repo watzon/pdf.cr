@@ -103,11 +103,11 @@ module PDF
 
           # Get the glyph name for a glyph ID
           def glyph_name(glyph_id : UInt16) : String?
-            return nil if @version < 2.0 || @version >= 2.5
+            return if @version < 2.0 || @version >= 2.5
 
             indices = @glyph_name_indices
             names = @glyph_names
-            return nil unless indices && glyph_id < indices.size
+            return unless indices && glyph_id < indices.size
 
             index = indices[glyph_id]
 
@@ -118,8 +118,6 @@ module PDF
               # Extra glyph name
               extra_index = index.to_i - 258
               extra_index >= 0 && extra_index < names.size ? names[extra_index] : nil
-            else
-              nil
             end
           end
 

@@ -66,7 +66,7 @@ describe PDF::Fonts::TrueType::Subsetter do
       subsetter.subset
 
       mapping = subsetter.unicode_to_glyph_map
-      glyph_ids = mapping.values.sort
+      glyph_ids = mapping.values.sort!
 
       # IDs should be low numbers (starting after .notdef at 0)
       glyph_ids.each do |id|
