@@ -65,7 +65,7 @@ describe PDF::Table do
         ],
       )
       table.row_heights.size.should eq(2)
-      table.row_heights.each { |h| h.should be > 0 }
+      table.row_heights.each(&.should(be > 0))
     end
   end
 
@@ -93,7 +93,7 @@ describe PDF::Table do
 
   describe "colspan support" do
     it "handles cells with colspan" do
-      hash_cell = Hash(Symbol, String | Int32 | Float64 | Bool | Nil).new
+      hash_cell = Hash(Symbol, String | Int32 | Float64 | Bool?).new
       hash_cell[:content] = "Wide"
       hash_cell[:colspan] = 2
 
@@ -141,7 +141,7 @@ describe PDF::Table do
             ["C", "D"],
           ],
           column_widths: [100.0, 100.0],
-          cell_style: ({:background_color => "EEEEEE"} of Symbol => String | Float64 | Bool | Nil),
+          cell_style: ({:background_color => "EEEEEE"} of Symbol => String | Float64 | Bool?),
         )
         table.draw(page, x: 50.0, y: 700.0)
       end
@@ -251,7 +251,7 @@ describe PDF::Table do
     end
 
     it "does not override an explicit per-cell background with row_colors" do
-      hash_cell = Hash(Symbol, String | Int32 | Float64 | Bool | Nil).new
+      hash_cell = Hash(Symbol, String | Int32 | Float64 | Bool?).new
       hash_cell[:content] = "A"
       hash_cell[:background_color] = "FF0000"
 
@@ -335,11 +335,11 @@ describe PDF::Table do
           t.cells[0][0].effective_font_name.should_not contain("Roman-")
         end
       end
-      PDF::Table::Cell.new("x").tap { |c| c.font_name = "Times-Roman"; c.bold = true }.effective_font_name.should eq("Times-Bold")
-      PDF::Table::Cell.new("x").tap { |c| c.font_name = "Times-Roman"; c.italic = true }.effective_font_name.should eq("Times-Italic")
-      PDF::Table::Cell.new("x").tap { |c| c.font_name = "Courier"; c.bold = true; c.italic = true }.effective_font_name.should eq("Courier-BoldOblique")
-      PDF::Table::Cell.new("x").tap { |c| c.bold = true }.effective_font_name.should eq("Helvetica-Bold")
-      PDF::Table::Cell.new("x").tap { |c| c.italic = true }.effective_font_name.should eq("Helvetica-Oblique")
+      PDF::Table::Cell.new("x").tap { |cell| cell.font_name = "Times-Roman"; cell.bold = true }.effective_font_name.should eq("Times-Bold")
+      PDF::Table::Cell.new("x").tap { |cell| cell.font_name = "Times-Roman"; cell.italic = true }.effective_font_name.should eq("Times-Italic")
+      PDF::Table::Cell.new("x").tap { |cell| cell.font_name = "Courier"; cell.bold = true; cell.italic = true }.effective_font_name.should eq("Courier-BoldOblique")
+      PDF::Table::Cell.new("x").tap(&.bold=(true)).effective_font_name.should eq("Helvetica-Bold")
+      PDF::Table::Cell.new("x").tap(&.italic=(true)).effective_font_name.should eq("Helvetica-Oblique")
     end
 
     it "draws each line of multi-line content separately" do
@@ -361,7 +361,7 @@ describe PDF::Table do
         page.font("Helvetica", size: 10)
         table.draw(page, x: 50.0, y: 700.0)
         cell = table.cells[0][0]
-        text_x = page.content_string.match(/([\d.]+) [\d.]+ Td\n\(WWWW\)/).not_nil![1].to_f
+        text_x = page.content_string.match!(/([\d.]+) [\d.]+ Td\n\(WWWW\)/)[1].to_f
         (text_x + cell.text_width("WWWW")).should be_close(250.0 - cell.padding_right, 0.5)
       end
     end
@@ -405,7 +405,7 @@ describe PDF::Table do
       doc.page do |page|
         page.font("Helvetica", size: 10)
         data = [
-          [({:content => "span", :rowspan => 2} of Symbol => String | Int32 | Float64 | Bool | Nil), "b"] of PDF::Table::CellData,
+          [({:content => "span", :rowspan => 2} of Symbol => String | Int32 | Float64 | Bool?), "b"] of PDF::Table::CellData,
           ["c"] of PDF::Table::CellData,
         ]
         table = PDF::Table.new(data: data, column_widths: [100.0, 100.0])

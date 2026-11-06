@@ -12,8 +12,8 @@ describe PDF::Table::Cell do
       cell.font_name.should eq("Helvetica")
       cell.font_size.should eq(10.0)
       cell.align.should eq(:left)
-      cell.bold.should be_false
-      cell.italic.should be_false
+      cell.bold?.should be_false
+      cell.italic?.should be_false
       cell.span_dummy?.should be_false
     end
 
@@ -41,7 +41,7 @@ describe PDF::Table::Cell do
     end
 
     it "creates a cell from a hash with content" do
-      data = Hash(Symbol, String | Int32 | Float64 | Bool | Nil).new
+      data = Hash(Symbol, String | Int32 | Float64 | Bool?).new
       data[:content] = "Hello"
       data[:colspan] = 2
       cell = PDF::Table::Cell.make(data)
@@ -50,7 +50,7 @@ describe PDF::Table::Cell do
     end
 
     it "creates a cell from a hash with background_color" do
-      data = Hash(Symbol, String | Int32 | Float64 | Bool | Nil).new
+      data = Hash(Symbol, String | Int32 | Float64 | Bool?).new
       data[:content] = "Hello"
       data[:background_color] = "CCCCCC"
       cell = PDF::Table::Cell.make(data)
@@ -103,14 +103,14 @@ describe PDF::Table::Cell do
       cell = PDF::Table::Cell.new("Test")
       cell.width = 100.0
       cell.height = 50.0
-      cell.content_width.should eq(90.0) # 100 - 5 - 5
+      cell.content_width.should eq(90.0)  # 100 - 5 - 5
       cell.content_height.should eq(40.0) # 50 - 5 - 5
     end
   end
 
   describe "numeric option coercion" do
     it "accepts Int for Float options and Float for Int options" do
-      cell = PDF::Table::Cell.make({:content => "x", :font_size => 12, :border_width => 2, :padding => 3, :colspan => 2.0, :rowspan => 3.0} of Symbol => String | Int32 | Float64 | Bool | Nil)
+      cell = PDF::Table::Cell.make({:content => "x", :font_size => 12, :border_width => 2, :padding => 3, :colspan => 2.0, :rowspan => 3.0} of Symbol => String | Int32 | Float64 | Bool?)
       cell.font_size.should eq(12.0)
       cell.border_width.should eq(2.0)
       cell.padding.should eq([3.0, 3.0, 3.0, 3.0])

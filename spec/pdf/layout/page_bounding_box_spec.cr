@@ -56,6 +56,7 @@ describe PDF::Page do
           ctx.width.should eq(200.0)
           ctx.height.should eq(100.0)
         end
+        box.width.should eq(200.0)
       end
     end
 

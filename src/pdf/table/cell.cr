@@ -63,18 +63,13 @@ module PDF
       property align : Symbol = :left
 
       # Whether this cell is bold
-      property bold : Bool = false
+      property? bold : Bool = false
 
       # Whether this cell is italic
-      property italic : Bool = false
+      property? italic : Bool = false
 
       # Whether this is a span dummy (placeholder for spanned cells)
-      property span_dummy : Bool = false
-
-      # Alias for span_dummy
-      def span_dummy? : Bool
-        @span_dummy
-      end
+      property? span_dummy : Bool = false
 
       # The master cell for span dummies
       property master_cell : Cell? = nil
@@ -89,57 +84,73 @@ module PDF
       end
 
       # Creates a cell from various input types.
-      def self.make(content : String | Hash(Symbol, String | Int32 | Float64 | Bool | Nil) | Cell) : Cell
+      def self.make(content : String | Hash(Symbol, String | Int32 | Float64 | Bool?) | Cell) : Cell
         case content
         when String
           Cell.new(content)
         when Cell
           content
         when Hash
-          cell = Cell.new(content[:content]?.try(&.to_s) || "")
-          if colspan = to_int(content[:colspan]?)
-            cell.colspan = colspan
-          end
-          if rowspan = to_int(content[:rowspan]?)
-            cell.rowspan = rowspan
-          end
-          if bg = content[:background_color]?
-            cell.background_color = bg.to_s
-          end
-          if tc = content[:text_color]?
-            cell.text_color = tc.to_s
-          end
-          if bc = content[:border_color]?
-            cell.border_color = bc.to_s
-          end
-          if fn = content[:font_name]?
-            cell.font_name = fn.to_s
-          end
-          if fs = to_float(content[:font_size]?)
-            cell.font_size = fs
-          end
-          if bw = to_float(content[:border_width]?)
-            cell.border_width = bw
-          end
-          if pad = to_float(content[:padding]?)
-            cell.padding = [pad, pad, pad, pad]
-          end
-          if al = content[:align]?
-            case al.to_s
-            when "center" then cell.align = :center
-            when "right"  then cell.align = :right
-            when "left"   then cell.align = :left
-            end
-          end
-          if b = content[:bold]?
-            cell.bold = b == true
-          end
-          if i = content[:italic]?
-            cell.italic = i == true
-          end
-          cell
+          from_hash(content)
         else
           Cell.new(content.to_s)
+        end
+      end
+
+      private def self.from_hash(options : Hash(Symbol, String | Int32 | Float64 | Bool?)) : Cell
+        cell = Cell.new(options[:content]?.try(&.to_s) || "")
+        apply_span_options(cell, options)
+        apply_box_options(cell, options)
+        apply_font_options(cell, options)
+        cell
+      end
+
+      private def self.apply_span_options(cell : Cell, options : Hash(Symbol, String | Int32 | Float64 | Bool?)) : Nil
+        if colspan = to_int(options[:colspan]?)
+          cell.colspan = colspan
+        end
+        if rowspan = to_int(options[:rowspan]?)
+          cell.rowspan = rowspan
+        end
+      end
+
+      private def self.apply_box_options(cell : Cell, options : Hash(Symbol, String | Int32 | Float64 | Bool?)) : Nil
+        if bg = options[:background_color]?
+          cell.background_color = bg.to_s
+        end
+        if tc = options[:text_color]?
+          cell.text_color = tc.to_s
+        end
+        if bc = options[:border_color]?
+          cell.border_color = bc.to_s
+        end
+        if bw = to_float(options[:border_width]?)
+          cell.border_width = bw
+        end
+        if pad = to_float(options[:padding]?)
+          cell.padding = [pad, pad, pad, pad]
+        end
+      end
+
+      private def self.apply_font_options(cell : Cell, options : Hash(Symbol, String | Int32 | Float64 | Bool?)) : Nil
+        if fn = options[:font_name]?
+          cell.font_name = fn.to_s
+        end
+        if fs = to_float(options[:font_size]?)
+          cell.font_size = fs
+        end
+        if al = options[:align]?
+          case al.to_s
+          when "center" then cell.align = :center
+          when "right"  then cell.align = :right
+          when "left"   then cell.align = :left
+          end
+        end
+        if b = options[:bold]?
+          cell.bold = b == true
+        end
+        if i = options[:italic]?
+          cell.italic = i == true
         end
       end
 

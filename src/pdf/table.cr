@@ -21,7 +21,7 @@ module PDF
   # ```
   class Table
     # Type alias for cell input data
-    alias CellData = String | Hash(Symbol, String | Int32 | Float64 | Bool | Nil)
+    alias CellData = String | Hash(Symbol, String | Int32 | Float64 | Bool?)
 
     # The grid of cells (row-major order)
     getter cells : Array(Array(Cell))
@@ -45,7 +45,7 @@ module PDF
     property table_width : Float64? = nil
 
     # Cell style defaults
-    property cell_style : Hash(Symbol, String | Float64 | Bool | Nil) = {} of Symbol => String | Float64 | Bool | Nil
+    property cell_style : Hash(Symbol, String | Float64 | Bool?) = {} of Symbol => String | Float64 | Bool?
 
     # Row colors for alternating stripes
     property row_colors : Array(String)? = nil
@@ -56,18 +56,18 @@ module PDF
       header : Bool | Int32 = false,
       column_widths : Array(Float64)? = nil,
       table_width : Float64? = nil,
-      cell_style : Hash(Symbol, String | Float64 | Bool | Nil)? = nil,
+      cell_style : Hash(Symbol, String | Float64 | Bool?)? = nil,
       row_colors : Array(String)? = nil,
     )
       @header = header.is_a?(Bool) ? (header ? 1 : 0) : header
       @table_width = table_width
       @row_colors = row_colors
-      @cell_style = cell_style || {} of Symbol => String | Float64 | Bool | Nil
+      @cell_style = cell_style || {} of Symbol => String | Float64 | Bool?
 
       # Build cell grid from data
       @cells = build_cells(data)
       @row_count = @cells.size
-      @column_count = @cells.empty? ? 0 : @cells.map(&.size).max
+      @column_count = @cells.empty? ? 0 : @cells.max_of(&.size)
 
       apply_row_colors
 
@@ -125,7 +125,7 @@ module PDF
       fresh_page = false
 
       row_groups.each do |group|
-        group_height = group.sum { |r| @row_heights[r] }
+        group_height = group.sum { |group_row| @row_heights[group_row] }
 
         if group_height > remaining_height && !fresh_page
           current_page, current_y = block.call
@@ -143,10 +143,10 @@ module PDF
           end
         end
 
-        group.each do |r|
-          draw_row(current_page, r, x, current_y)
-          current_y -= @row_heights[r]
-          remaining_height -= @row_heights[r]
+        group.each do |group_row|
+          draw_row(current_page, group_row, x, current_y)
+          current_y -= @row_heights[group_row]
+          remaining_height -= @row_heights[group_row]
         end
         fresh_page = false
       end
@@ -210,8 +210,8 @@ module PDF
 
           # Create span dummies for colspan
           if cell.colspan > 1
-            (1...cell.colspan).each do |c|
-              dummy = cell.create_span_dummy(row_idx, col_idx + c)
+            (1...cell.colspan).each do |col_offset|
+              dummy = cell.create_span_dummy(row_idx, col_idx + col_offset)
               row << dummy
             end
           end
@@ -228,12 +228,12 @@ module PDF
           next if cell.span_dummy?
           next if cell.rowspan <= 1
 
-          (1...cell.rowspan).each do |r|
-            target_row = row_idx + r
+          (1...cell.rowspan).each do |row_offset|
+            target_row = row_idx + row_offset
             next if target_row >= grid.size
 
-            (0...cell.colspan).each do |c|
-              target_col = col_idx + c
+            (0...cell.colspan).each do |col_offset|
+              target_col = col_idx + col_offset
               dummy = cell.create_span_dummy(target_row, target_col)
               # Insert dummy at the right position
               if target_col < grid[target_row].size
@@ -313,8 +313,8 @@ module PDF
             else
               # Distribute spanned width equally
               per_col = cell_width / cell.colspan
-              (0...cell.colspan).each do |c|
-                target = col_idx + c
+              (0...cell.colspan).each do |col_offset|
+                target = col_idx + col_offset
                 if target < @column_count
                   widths[target] = Math.max(widths[target], per_col)
                 end
@@ -324,7 +324,7 @@ module PDF
         end
 
         # Ensure minimum width
-        widths.map { |w| Math.max(w, 30.0) }
+        widths.map { |width| Math.max(width, 30.0) }
       end
     end
 
@@ -344,8 +344,8 @@ module PDF
           else
             # Distribute spanned height equally
             per_row = cell_height / cell.rowspan
-            (0...cell.rowspan).each do |r|
-              target = row_idx + r
+            (0...cell.rowspan).each do |row_offset|
+              target = row_idx + row_offset
               if target < @row_count
                 heights[target] = Math.max(heights[target], per_row)
               end
@@ -369,8 +369,8 @@ module PDF
 
           # Calculate cell dimensions based on spans
           cell_width = 0.0
-          (0...cell.colspan).each do |c|
-            target = col_idx + c
+          (0...cell.colspan).each do |col_offset|
+            target = col_idx + col_offset
             if target < @column_widths.size
               cell_width += @column_widths[target]
             end
@@ -378,8 +378,8 @@ module PDF
           cell.width = cell_width
 
           cell_height = 0.0
-          (0...cell.rowspan).each do |r|
-            target = row_idx + r
+          (0...cell.rowspan).each do |row_offset|
+            target = row_idx + row_offset
             if target < @row_heights.size
               cell_height += @row_heights[target]
             end
@@ -403,8 +403,8 @@ module PDF
         cell.y = y
 
         cell_width = 0.0
-        (0...cell.colspan).each do |c|
-          target = col_idx + c
+        (0...cell.colspan).each do |col_offset|
+          target = col_idx + col_offset
           if target < @column_widths.size
             cell_width += @column_widths[target]
           end
@@ -412,8 +412,8 @@ module PDF
         cell.width = cell_width
 
         cell_height = 0.0
-        (0...cell.rowspan).each do |r|
-          target = row_idx + r
+        (0...cell.rowspan).each do |row_offset|
+          target = row_idx + row_offset
           if target < @row_heights.size
             cell_height += @row_heights[target]
           end

@@ -20,7 +20,7 @@ module PDF
       header : Bool | Int32 = false,
       column_widths : Array(Float64)? = nil,
       table_width : Float64? = nil,
-      cell_style : Hash(Symbol, String | Float64 | Bool | Nil)? = nil,
+      cell_style : Hash(Symbol, String | Float64 | Bool?)? = nil,
       row_colors : Array(String)? = nil,
     ) : Table forall T
       rows = data.map do |row|
@@ -35,7 +35,7 @@ module PDF
     end
 
     private def normalize_table_cell(cell : Hash | NamedTuple) : Table::CellData
-      hash = {} of Symbol => String | Int32 | Float64 | Bool | Nil
+      hash = {} of Symbol => String | Int32 | Float64 | Bool?
       cell.each do |key, value|
         hash[key] = case value
                     when Int               then value.to_i32
@@ -54,7 +54,7 @@ module PDF
       header : Bool | Int32 = false,
       column_widths : Array(Float64)? = nil,
       table_width : Float64? = nil,
-      cell_style : Hash(Symbol, String | Float64 | Bool | Nil)? = nil,
+      cell_style : Hash(Symbol, String | Float64 | Bool?)? = nil,
       row_colors : Array(String)? = nil,
     ) : Table
       table = Table.new(
