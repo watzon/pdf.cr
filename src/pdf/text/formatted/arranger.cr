@@ -89,7 +89,7 @@ module PDF
         # Consumes and returns the next fragment's text string.
         # Returns nil if no more fragments are available.
         def next_string : String?
-          return nil if @unconsumed.empty?
+          return if @unconsumed.empty?
 
           hash = @unconsumed.shift
           @consumed << hash.dup
@@ -104,7 +104,7 @@ module PDF
 
         # Peeks at the next fragment's text without consuming it.
         def preview_next_string : String?
-          return nil if @unconsumed.empty?
+          return if @unconsumed.empty?
           @unconsumed.first[:text].as(String)
         end
 
@@ -200,7 +200,7 @@ module PDF
       # A hash representing a fragment of formatted text.
       # Keys: :text (String), :styles (Array(Symbol)), :color (String?),
       #        :font (String?), :size (Float64?)
-      alias FragmentHash = Hash(Symbol, String | Array(Symbol) | Float64 | Bool | Nil)
+      alias FragmentHash = Hash(Symbol, String | Array(Symbol) | Float64 | Bool?)
     end
   end
 end

@@ -1,12 +1,5 @@
 module PDF
   class Table
-    # Exposes FontMeasurer's standard-14 bold/italic name mapping.
-    class StyleResolver < Text::Formatted::FontMeasurer
-      def resolve(base_name : String, styles : Array(Symbol)) : String
-        resolve_font_name(base_name, styles)
-      end
-    end
-
     # Represents a single cell in a table. A cell has content, position,
     # dimensions, padding, borders, and optional span.
     #
@@ -187,7 +180,7 @@ module PDF
         styles << :bold if @bold
         styles << :italic if @italic
         return @font_name if styles.empty?
-        StyleResolver.new(@@measure_document).resolve(@font_name, styles)
+        Text::Formatted::FontMeasurer.resolve_font_name(@font_name, styles)
       end
 
       # Width of a text string in this cell's font, using real font metrics.

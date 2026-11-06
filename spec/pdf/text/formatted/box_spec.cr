@@ -13,12 +13,8 @@ module BoxSpecHelper
 
   def self.make_doc_and_page : Tuple(PDF::Document, PDF::Page)
     doc = PDF::Document.new
-    page_ref : PDF::Page? = nil
-    doc.page do |p|
-      p.font("Helvetica", size: 12)
-      page_ref = p
-    end
-    {doc, page_ref.not_nil!}
+    page = doc.page(&.font("Helvetica", size: 12))
+    {doc, page}
   end
 end
 
@@ -229,7 +225,7 @@ describe PDF::Text::Formatted::Box do
         height: 30.0,
         document: doc,
       )
-      height, remaining = box.dry_run
+      _, remaining = box.dry_run
       remaining.should_not be_empty
     end
   end

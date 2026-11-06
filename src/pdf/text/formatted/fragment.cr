@@ -9,8 +9,8 @@ module PDF
       #
       # ```
       # fragment = Fragment.new("Hello", {styles: [:bold], color: "FF0000"})
-      # fragment.bold?    # => true
-      # fragment.italic?  # => false
+      # fragment.bold?   # => true
+      # fragment.italic? # => false
       # ```
       class Fragment
         # The text content of this fragment
@@ -158,7 +158,7 @@ module PDF
           @styles : Array(Symbol) = [] of Symbol,
           @color : String? = nil,
           @font : String? = nil,
-          @size : Float64? = nil
+          @size : Float64? = nil,
         )
         end
 

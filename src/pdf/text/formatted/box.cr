@@ -340,13 +340,11 @@ module PDF
           end
 
           # Save graphics state for color changes
-          has_color = !fragment.color.nil?
+          rgb = fragment.color.try { |color| parse_hex_color(color) }
 
-          if has_color
+          if rgb
             page.save_graphics_state
-            color_str = fragment.color.not_nil!
-            r, g, b = parse_hex_color(color_str)
-            page.fill_color(r, g, b)
+            page.fill_color(*rgb)
           end
 
           # Set font and draw text
@@ -359,39 +357,24 @@ module PDF
             page.text(fragment.text, at: {x, y})
           end
 
+          end_x = fragment.left + fragment.actual_width
           # Draw underline if needed
-          if fragment.underline?
-            underline_y = y - 1.25
-            page.save_graphics_state
-            if has_color
-              r, g, b = parse_hex_color(fragment.color.not_nil!)
-              page.stroke_color(r, g, b)
-            end
-            page.line_width(font_size * 0.05)
-            page.move_to(x, underline_y)
-            page.line_to(fragment.left + fragment.actual_width, underline_y)
-            page.stroke
-            page.restore_graphics_state
-          end
-
+          draw_decoration_line(page, x, end_x, y - 1.25, font_size, rgb) if fragment.underline?
           # Draw strikethrough if needed
-          if fragment.strikethrough?
-            strike_y = y + (fragment.ascender * 0.3)
-            page.save_graphics_state
-            if has_color
-              r, g, b = parse_hex_color(fragment.color.not_nil!)
-              page.stroke_color(r, g, b)
-            end
-            page.line_width(font_size * 0.05)
-            page.move_to(x, strike_y)
-            page.line_to(fragment.left + fragment.actual_width, strike_y)
-            page.stroke
-            page.restore_graphics_state
-          end
+          draw_decoration_line(page, x, end_x, y + (fragment.ascender * 0.3), font_size, rgb) if fragment.strikethrough?
 
-          if has_color
-            page.restore_graphics_state
-          end
+          page.restore_graphics_state if rgb
+        end
+
+        private def draw_decoration_line(page : Page, x : Float64, end_x : Float64, line_y : Float64,
+                                         font_size : Float64, rgb : Tuple(Float64, Float64, Float64)?) : Nil
+          page.save_graphics_state
+          page.stroke_color(*rgb) if rgb
+          page.line_width(font_size * 0.05)
+          page.move_to(x, line_y)
+          page.line_to(end_x, line_y)
+          page.stroke
+          page.restore_graphics_state
         end
 
         private def draw_justified_fragment(page : Page, fragment : Fragment, x : Float64, y : Float64, font_size : Float64) : Nil
@@ -430,45 +413,7 @@ module PDF
         end
 
         private def resolve_font_name(format_state : FormatState) : String
-          base = format_state.font || @font_name
-          styles = format_state.styles
-          has_bold = styles.includes?(:bold)
-          has_italic = styles.includes?(:italic)
-
-          case base
-          when "Helvetica"
-            if has_bold && has_italic
-              "Helvetica-BoldOblique"
-            elsif has_bold
-              "Helvetica-Bold"
-            elsif has_italic
-              "Helvetica-Oblique"
-            else
-              "Helvetica"
-            end
-          when "Times-Roman", "Times"
-            if has_bold && has_italic
-              "Times-BoldItalic"
-            elsif has_bold
-              "Times-Bold"
-            elsif has_italic
-              "Times-Italic"
-            else
-              "Times-Roman"
-            end
-          when "Courier"
-            if has_bold && has_italic
-              "Courier-BoldOblique"
-            elsif has_bold
-              "Courier-Bold"
-            elsif has_italic
-              "Courier-Oblique"
-            else
-              "Courier"
-            end
-          else
-            base
-          end
+          FontMeasurer.resolve_font_name(format_state.font || @font_name, format_state.styles)
         end
       end
     end

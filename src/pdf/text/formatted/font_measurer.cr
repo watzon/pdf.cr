@@ -55,7 +55,7 @@ module PDF
         # Resolves the font name based on the format state's styles.
         private def resolve_font(format_state : FormatState) : Fonts::Base
           font_name = format_state.font || @font_name
-          resolved_name = resolve_font_name(font_name, format_state.styles)
+          resolved_name = FontMeasurer.resolve_font_name(font_name, format_state.styles)
           @document.font(resolved_name)
         end
 
@@ -70,48 +70,25 @@ module PDF
           end
         end
 
+        # Bold/italic variants of the standard 14 PDF fonts, indexed by
+        # `(bold ? 1 : 0) + (italic ? 2 : 0)`.
+        STYLE_VARIANTS = {
+          "Helvetica"   => {"Helvetica", "Helvetica-Bold", "Helvetica-Oblique", "Helvetica-BoldOblique"},
+          "Times-Roman" => {"Times-Roman", "Times-Bold", "Times-Italic", "Times-BoldItalic"},
+          "Times"       => {"Times-Roman", "Times-Bold", "Times-Italic", "Times-BoldItalic"},
+          "Courier"     => {"Courier", "Courier-Bold", "Courier-Oblique", "Courier-BoldOblique"},
+        }
+
         # Resolves a font name with style variants.
         # Maps base font names to their bold/italic/bold-italic variants
-        # for the standard 14 PDF fonts.
-        private def resolve_font_name(base_name : String, styles : Array(Symbol)) : String
-          has_bold = styles.includes?(:bold)
-          has_italic = styles.includes?(:italic)
+        # for the standard 14 PDF fonts. Already-qualified or unknown font
+        # names are returned as-is.
+        def self.resolve_font_name(base_name : String, styles : Array(Symbol)) : String
+          variants = STYLE_VARIANTS[base_name]?
+          return base_name unless variants
 
-          case base_name
-          when "Helvetica"
-            if has_bold && has_italic
-              "Helvetica-BoldOblique"
-            elsif has_bold
-              "Helvetica-Bold"
-            elsif has_italic
-              "Helvetica-Oblique"
-            else
-              "Helvetica"
-            end
-          when "Times-Roman", "Times"
-            if has_bold && has_italic
-              "Times-BoldItalic"
-            elsif has_bold
-              "Times-Bold"
-            elsif has_italic
-              "Times-Italic"
-            else
-              "Times-Roman"
-            end
-          when "Courier"
-            if has_bold && has_italic
-              "Courier-BoldOblique"
-            elsif has_bold
-              "Courier-Bold"
-            elsif has_italic
-              "Courier-Oblique"
-            else
-              "Courier"
-            end
-          else
-            # For already-qualified font names or unknown fonts, return as-is
-            base_name
-          end
+          index = (styles.includes?(:bold) ? 1 : 0) + (styles.includes?(:italic) ? 2 : 0)
+          variants[index]
         end
       end
     end

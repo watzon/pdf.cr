@@ -86,7 +86,7 @@ module PDF
         def wrap_line(*, arranger : Arranger, width : Float64, font_measurer : FontMeasurer) : String
           initialize_line(width: width, arranger: arranger)
 
-          while (fragment = arranger.next_string)
+          while fragment = arranger.next_string
             @fragment_output = ""
 
             # Strip leading whitespace on the first fragment of a line
