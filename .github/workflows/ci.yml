@@ -30,6 +30,11 @@ jobs:
       - name: Run tests
         run: crystal spec --error-trace
 
+      - name: Build Ameba
+        # Ameba 1.7 no longer builds bin/ameba during `shards install`.
+        run: crystal build -o bin/ameba lib/ameba/bin/ameba.cr
+        if: matrix.crystal == 'latest'
+
       - name: Run Ameba linter
         run: bin/ameba
         if: matrix.crystal == 'latest'
