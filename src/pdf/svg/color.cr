@@ -5,7 +5,8 @@ module PDF
     # Supports:
     # - Named colors (red, blue, etc.)
     # - Hex colors (#RGB, #RRGGBB)
-    # - rgb() functional notation
+    # - rgb() and rgba() functional notation, with numbers or percentages
+    # - #RGBA and #RRGGBBAA hex colors and `transparent` (see `.parse_rgba`)
     #
     # Ported from Prawn::SVG::Color.
     module Color
@@ -163,23 +164,52 @@ module PDF
 
         if color_string.starts_with?("#")
           parse_hex(color_string)
-        elsif color_string.starts_with?("rgb(")
+        elsif color_string.starts_with?("rgb")
           parse_rgb_function(color_string)
         elsif hex = NAMED_COLORS[color_string]?
           parse_hex("##{hex}")
         end
       end
 
+      # Parses a color string and returns an RGBA tuple (0.0-1.0). The
+      # alpha comes from rgba(), #RGBA and #RRGGBBAA, and is 0 for
+      # `transparent`. Other colors have an alpha of 1.
+      def self.parse_rgba(color_string : String?) : Tuple(Float64, Float64, Float64, Float64)?
+        return unless color_string
+        value = color_string.strip.downcase
+        return {0.0, 0.0, 0.0, 0.0} if value == "transparent"
+
+        rgb = parse(value)
+        return unless rgb
+
+        {rgb[0], rgb[1], rgb[2], alpha_of(value)}
+      end
+
+      private def self.alpha_of(value : String) : Float64
+        if value.starts_with?("#")
+          hex = value.lstrip('#')
+          return hex[3..3].to_i(16) / 15.0 if hex.size == 4
+          return hex[6..7].to_i(16) / 255.0 if hex.size == 8
+        elsif match = value.match(/\Argba?\((?:[^,]*,){3}\s*([\d.]+)(%?)\s*\)/)
+          alpha = match[1].to_f? || 1.0
+          alpha /= 100.0 unless match[2].empty?
+          return alpha.clamp(0.0, 1.0)
+        end
+        1.0
+      rescue
+        1.0
+      end
+
       # Parses a hex color string to RGB tuple.
       def self.parse_hex(hex : String) : Tuple(Float64, Float64, Float64)?
         hex = hex.lstrip('#')
         case hex.size
-        when 3
+        when 3, 4
           r = hex[0..0].to_i(16) * 17
           g = hex[1..1].to_i(16) * 17
           b = hex[2..2].to_i(16) * 17
           {r / 255.0, g / 255.0, b / 255.0}
-        when 6
+        when 6, 8
           r = hex[0..1].to_i(16)
           g = hex[2..3].to_i(16)
           b = hex[4..5].to_i(16)
@@ -189,17 +219,23 @@ module PDF
         nil
       end
 
-      # Parses rgb(r, g, b) functional notation.
+      # Parses rgb(r, g, b) and rgba(r, g, b, a) functional notation. Each
+      # channel is a number (0-255) or a percentage. Alpha is ignored here.
       def self.parse_rgb_function(value : String) : Tuple(Float64, Float64, Float64)?
-        match = value.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/)
+        match = value.match(/\Argba?\(\s*([\d.]+%?)\s*,\s*([\d.]+%?)\s*,\s*([\d.]+%?)\s*(?:,[^)]*)?\)/)
         return unless match
 
-        r = match[1].to_i.clamp(0, 255)
-        g = match[2].to_i.clamp(0, 255)
-        b = match[3].to_i.clamp(0, 255)
-        {r / 255.0, g / 255.0, b / 255.0}
+        {channel(match[1]), channel(match[2]), channel(match[3])}
       rescue
         nil
+      end
+
+      private def self.channel(value : String) : Float64
+        if value.ends_with?('%')
+          (value.rchop.to_f / 100.0).clamp(0.0, 1.0)
+        else
+          value.to_f.clamp(0.0, 255.0) / 255.0
+        end
       end
 
       # Converts an RGB tuple to a hex string (without #).
