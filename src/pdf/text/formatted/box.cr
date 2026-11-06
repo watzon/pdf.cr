@@ -35,8 +35,21 @@ module PDF
         # Text alignment (:left, :center, :right, :justify)
         getter align : Symbol
 
-        # Overflow behavior (:truncate, :expand)
+        # Overflow behavior:
+        # - `:truncate` stops rendering when the height is used up (default)
+        # - `:expand` ignores the height limit and renders all text
+        # - `:shrink_to_fit` reduces the font size in 0.5pt steps (down to
+        #   `MIN_SHRINK_SIZE`) until all text fits. Fragments with their own
+        #   `:size` are scaled by the same ratio.
         getter overflow : Symbol
+
+        OVERFLOW_MODES = [:truncate, :expand, :shrink_to_fit]
+
+        # Smallest font size used by `:shrink_to_fit`.
+        MIN_SHRINK_SIZE = 5.0
+
+        # Font size step used by `:shrink_to_fit`.
+        SHRINK_STEP = 0.5
 
         # Leading (extra space between lines)
         getter leading : Float64
@@ -76,8 +89,11 @@ module PDF
           @leading : Float64 = 0.0,
           @document : Document,
           @font_name : String = "Helvetica",
-          @font_size : Float64 = 12.0
+          @font_size : Float64 = 12.0,
         )
+          unless OVERFLOW_MODES.includes?(@overflow)
+            raise ArgumentError.new("Invalid overflow mode: #{@overflow.inspect}. Expected one of #{OVERFLOW_MODES.map(&.inspect).join(", ")}")
+          end
           @formatted_text = formatted_text
         end
 
@@ -86,6 +102,10 @@ module PDF
         # Returns an array of fragment hashes representing any text that
         # did not fit within the box dimensions.
         def render(page : Page) : Array(FragmentHash)
+          with_overflow_strategy { render_pass(page) }
+        end
+
+        private def render_pass(page : Page) : Array(FragmentHash)
           font_measurer = FontMeasurer.new(@document, @font_name, @font_size)
           arranger = Arranger.new
           line_wrap = LineWrap.new
@@ -105,6 +125,12 @@ module PDF
               font_measurer: font_measurer,
             )
 
+            # No progress possible (nothing consumed, no newline): stop
+            if arranger.consumed.empty? && !line_wrap.newline_encountered? && !arranger.finished?
+              arranger.repack_unretrieved
+              break
+            end
+
             # Check if there's enough height for this line
             @line_height = arranger.max_line_height
             @descender = arranger.max_descender
@@ -118,7 +144,7 @@ module PDF
 
             required_height = @baseline_y.abs + diff
 
-            if required_height > @height + 0.0001
+            if required_height > height_limit + 0.0001
               # No room for this line
               arranger.repack_unretrieved
               break
@@ -149,6 +175,48 @@ module PDF
         # Performs a dry run to calculate dimensions without drawing.
         # Returns the remaining text that would not fit.
         def dry_run : Tuple(Float64, Array(FragmentHash))
+          with_overflow_strategy { measure_pass }
+        end
+
+        # The height limit in effect for the current overflow mode.
+        private def height_limit : Float64
+          @overflow == :expand ? Float64::MAX : @height
+        end
+
+        # Runs the block at the original size, or for `:shrink_to_fit` at the
+        # largest size (stepping down by `SHRINK_STEP`) at which all text fits.
+        private def with_overflow_strategy(&)
+          return yield unless @overflow == :shrink_to_fit
+
+          original_size = @font_size
+          original_text = @formatted_text
+          size = original_size
+          begin
+            loop do
+              @font_size = size
+              @formatted_text = scale_fragments(original_text, size / original_size)
+              break if measure_pass[1].empty?
+              break if size - SHRINK_STEP < MIN_SHRINK_SIZE
+              size -= SHRINK_STEP
+            end
+            yield
+          ensure
+            @font_size = original_size
+            @formatted_text = original_text
+          end
+        end
+
+        private def scale_fragments(fragments : Array(FragmentHash), ratio : Float64) : Array(FragmentHash)
+          fragments.map do |hash|
+            copy = hash.dup
+            if (frag_size = copy[:size]?).is_a?(Float64)
+              copy[:size] = frag_size * ratio
+            end
+            copy
+          end
+        end
+
+        private def measure_pass : Tuple(Float64, Array(FragmentHash))
           font_measurer = FontMeasurer.new(@document, @font_name, @font_size)
           arranger = Arranger.new
           line_wrap = LineWrap.new
@@ -167,6 +235,11 @@ module PDF
               font_measurer: font_measurer,
             )
 
+            if arranger.consumed.empty? && !line_wrap.newline_encountered? && !arranger.finished?
+              arranger.repack_unretrieved
+              break
+            end
+
             line_height = arranger.max_line_height
             descender_val = arranger.max_descender
             ascender_val = arranger.max_ascender
@@ -179,7 +252,7 @@ module PDF
 
             required_height = baseline_y.abs + diff
 
-            if required_height > @height + 0.0001
+            if required_height > height_limit + 0.0001
               arranger.repack_unretrieved
               break
             end
@@ -201,6 +274,7 @@ module PDF
           fragments = arranger.fragments.dup
           return if fragments.empty?
 
+          trim_trailing_whitespace(fragments, font_measurer)
           line_width = fragments.sum(&.actual_width)
 
           # Calculate word spacing for justified text
@@ -238,6 +312,19 @@ module PDF
             draw_fragment(page, fragment, x, y, font_measurer)
 
             accumulated_x += fragment.actual_width
+          end
+        end
+
+        # Trailing whitespace is not visible, so it must not count towards
+        # the line width, alignment, or justified word spacing.
+        private def trim_trailing_whitespace(fragments : Array(Fragment), font_measurer : FontMeasurer) : Nil
+          fragments.reverse_each do |fragment|
+            trimmed = fragment.text.rstrip
+            if trimmed.size != fragment.text.size
+              fragment.text = trimmed
+              fragment.width = font_measurer.measure_width(trimmed, fragment.format_state)
+            end
+            break unless trimmed.empty?
           end
         end
 
@@ -325,19 +412,19 @@ module PDF
         end
 
         private def parse_hex_color(hex : String) : Tuple(Float64, Float64, Float64)
-          hex = hex.lstrip('#')
-          if hex.size == 3
-            r = hex[0..0].to_i(16) / 15.0
-            g = hex[1..1].to_i(16) / 15.0
-            b = hex[2..2].to_i(16) / 15.0
-          elsif hex.size == 6
-            r = hex[0..1].to_i(16) / 255.0
-            g = hex[2..3].to_i(16) / 255.0
-            b = hex[4..5].to_i(16) / 255.0
+          digits = hex.lchop('#')
+          unless digits.matches?(/\A(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\z/)
+            raise ArgumentError.new("Invalid hex color: #{hex.inspect}. Use RGB or RRGGBB, with an optional leading #.")
+          end
+
+          if digits.size == 3
+            r = digits[0..0].to_i(16) / 15.0
+            g = digits[1..1].to_i(16) / 15.0
+            b = digits[2..2].to_i(16) / 15.0
           else
-            r = 0.0
-            g = 0.0
-            b = 0.0
+            r = digits[0..1].to_i(16) / 255.0
+            g = digits[2..3].to_i(16) / 255.0
+            b = digits[4..5].to_i(16) / 255.0
           end
           {r, g, b}
         end

@@ -164,6 +164,15 @@ module PDF
           end
         end
 
+        # Sets the line metrics of an empty line from the current format state,
+        # so that blank lines advance the baseline like text lines do.
+        def use_blank_line_metrics(font_measurer : FontMeasurer) : Nil
+          metrics = font_measurer.metrics(@current_format_state)
+          @max_line_height = metrics[:line_height]
+          @max_descender = metrics[:descender]
+          @max_ascender = metrics[:ascender]
+        end
+
         # Repacks unconsumed fragments (used when line doesn't fit).
         def repack_unretrieved : Nil
           new_unconsumed = @consumed.map do |hash|

@@ -36,7 +36,7 @@ module PDF
       overflow : Symbol = :truncate,
       leading : Number = 0,
       font_name : String = "Helvetica",
-      font_size : Number = 12
+      font_size : Number = 12,
     ) : Array(Text::Formatted::FragmentHash)
       box = Text::Formatted::Box.new(
         formatted_text: fragments,
@@ -51,6 +51,44 @@ module PDF
         font_size: font_size.to_f,
       )
       box.render(self)
+    end
+
+    # Overload that accepts an array of named tuples, as in the example above.
+    # Each named tuple is converted to a `Text::Formatted::FragmentHash`.
+    # Integer `:size` values are converted to `Float64`.
+    def formatted_text_box(
+      fragments : Array,
+      *,
+      at : Tuple(Number, Number),
+      width : Number,
+      height : Number = Float64::MAX,
+      align : Symbol = :left,
+      overflow : Symbol = :truncate,
+      leading : Number = 0,
+      font_name : String = "Helvetica",
+      font_size : Number = 12,
+    ) : Array(Text::Formatted::FragmentHash)
+      hashes = fragments.map { |fragment| fragment_hash_from(fragment.to_h) }
+      formatted_text_box(
+        hashes,
+        at: at, width: width, height: height, align: align, overflow: overflow,
+        leading: leading, font_name: font_name, font_size: font_size,
+      )
+    end
+
+    private def fragment_hash_from(source : Hash) : Text::Formatted::FragmentHash
+      hash = Text::Formatted::FragmentHash.new
+      source.each do |key, value|
+        case value
+        when String, Array(Symbol), Float64, Bool, Nil
+          hash[key] = value
+        when Int, Float32
+          hash[key] = value.to_f64
+        else
+          raise ArgumentError.new("Unsupported value for #{key.inspect}: #{value.inspect}")
+        end
+      end
+      hash
     end
   end
 end

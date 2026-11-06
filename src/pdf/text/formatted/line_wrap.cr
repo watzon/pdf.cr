@@ -106,6 +106,8 @@ module PDF
           end
 
           arranger.finalize_line(font_measurer)
+          # A blank line (only a newline) still occupies one line of height
+          arranger.use_blank_line_metrics(font_measurer) if @newline_encountered && arranger.fragments.empty?
           @accumulated_width = arranger.line_width
           @space_count = arranger.space_count
           arranger.line
@@ -178,7 +180,8 @@ module PDF
           segment.each_char do |char|
             char_str = char.to_s
             char_width = font_measurer.measure_width(char_str, arranger.current_format_state)
-            if @accumulated_width + char_width <= @width
+            # Always place at least one character per line to guarantee progress
+            if @fragment_output.empty? || @accumulated_width + char_width <= @width
               @accumulated_width += char_width
               @fragment_output += char_str
             else
