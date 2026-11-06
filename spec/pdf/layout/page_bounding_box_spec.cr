@@ -179,6 +179,20 @@ describe PDF::Page do
       end
     end
 
+    it "accepts named tuple fragments in bounding and column boxes" do
+      doc = PDF::Document.new
+      doc.page do |page|
+        page.bounding_box(at: {50, 700}, width: 200, height: 100) do |box|
+          box.formatted_text([{text: "boxed", styles: [:bold]}]).should be_empty
+        end
+        page.column_box(at: {50, 500}, width: 400, height: 100) do |col|
+          col.formatted_text([{text: "columned", styles: [] of Symbol}]).should be_empty
+        end
+        page.content_string.should contain("(boxed)")
+        page.content_string.should contain("(columned)")
+      end
+    end
+
     it "places the first baseline below the top of the box" do
       doc = PDF::Document.new
       doc.page do |page|

@@ -14,7 +14,7 @@ module PDF
     # )
     # ```
     def table(
-      data : Array(Array(T)),
+      data : Array,
       *,
       at : Tuple(Number, Number) = {0, 0},
       header : Bool | Int32 = false,
@@ -22,7 +22,7 @@ module PDF
       table_width : Float64? = nil,
       cell_style : Hash(Symbol, String | Float64 | Bool?)? = nil,
       row_colors : Array(String)? = nil,
-    ) : Table forall T
+    ) : Table
       rows = data.map do |row|
         row.map { |cell| normalize_table_cell(cell).as(Table::CellData) }
       end

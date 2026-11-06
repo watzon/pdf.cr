@@ -157,9 +157,9 @@ module PDF
       # Parses a color string and returns an RGB tuple (0.0-1.0).
       # Returns nil for "none" or unparseable values.
       def self.parse(color_string : String?) : Tuple(Float64, Float64, Float64)?
-        return nil unless color_string
+        return unless color_string
         color_string = color_string.strip.downcase
-        return nil if color_string == "none" || color_string.empty?
+        return if color_string == "none" || color_string.empty?
 
         if color_string.starts_with?("#")
           parse_hex(color_string)
@@ -167,8 +167,6 @@ module PDF
           parse_rgb_function(color_string)
         elsif hex = NAMED_COLORS[color_string]?
           parse_hex("##{hex}")
-        else
-          nil
         end
       end
 
@@ -196,7 +194,7 @@ module PDF
       # Parses rgb(r, g, b) functional notation.
       def self.parse_rgb_function(value : String) : Tuple(Float64, Float64, Float64)?
         match = value.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/)
-        return nil unless match
+        return unless match
 
         r = match[1].to_i.clamp(0, 255)
         g = match[2].to_i.clamp(0, 255)

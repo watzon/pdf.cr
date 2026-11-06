@@ -68,27 +68,12 @@ module PDF
       font_name : String = "Helvetica",
       font_size : Number = 12,
     ) : Array(Text::Formatted::FragmentHash)
-      hashes = fragments.map { |fragment| fragment_hash_from(fragment.to_h) }
+      hashes = Text::Formatted.to_fragment_hashes(fragments)
       formatted_text_box(
         hashes,
         at: at, width: width, height: height, align: align, overflow: overflow,
         leading: leading, font_name: font_name, font_size: font_size,
       )
-    end
-
-    private def fragment_hash_from(source : Hash) : Text::Formatted::FragmentHash
-      hash = Text::Formatted::FragmentHash.new
-      source.each do |key, value|
-        case value
-        when String, Array(Symbol), Float64, Bool, Nil
-          hash[key] = value
-        when Int, Float32
-          hash[key] = value.to_f64
-        else
-          raise ArgumentError.new("Unsupported value for #{key.inspect}: #{value.inspect}")
-        end
-      end
-      hash
     end
   end
 end

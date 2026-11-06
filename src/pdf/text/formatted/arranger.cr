@@ -201,6 +201,28 @@ module PDF
       # Keys: :text (String), :styles (Array(Symbol)), :color (String?),
       #        :font (String?), :size (Float64?)
       alias FragmentHash = Hash(Symbol, String | Array(Symbol) | Float64 | Bool?)
+
+      # Converts an array of named tuples or hashes (for example
+      # `[{text: "Hi", styles: [:bold]}]`) into `FragmentHash` values.
+      # Integer and Float32 values become Float64.
+      def self.to_fragment_hashes(fragments : Array) : Array(FragmentHash)
+        fragments.map { |fragment| to_fragment_hash(fragment.to_h) }
+      end
+
+      private def self.to_fragment_hash(source : Hash) : FragmentHash
+        hash = FragmentHash.new
+        source.each do |key, value|
+          case value
+          when String, Array(Symbol), Float64, Bool, Nil
+            hash[key] = value
+          when Int, Float32
+            hash[key] = value.to_f64
+          else
+            raise ArgumentError.new("Unsupported value for #{key.inspect}: #{value.inspect}")
+          end
+        end
+        hash
+      end
     end
   end
 end

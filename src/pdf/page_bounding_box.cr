@@ -92,6 +92,11 @@ module PDF
       end
 
       # Draws formatted text within the bounding box at the current cursor.
+      # Overload that accepts named tuples, e.g. `[{text: "Hi", styles: [:bold]}]`.
+      def formatted_text(fragments : Array, **options) : Array(Text::Formatted::FragmentHash)
+        formatted_text(Text::Formatted.to_fragment_hashes(fragments), **options)
+      end
+
       def formatted_text(
         fragments : Array(Text::Formatted::FragmentHash),
         *,
@@ -181,6 +186,11 @@ module PDF
 
       # Draws formatted text within the current column. If text overflows,
       # it advances to the next column automatically.
+      # Overload that accepts named tuples, e.g. `[{text: "Hi", styles: [:bold]}]`.
+      def formatted_text(fragments : Array, **options) : Array(Text::Formatted::FragmentHash)
+        formatted_text(Text::Formatted.to_fragment_hashes(fragments), **options)
+      end
+
       def formatted_text(
         fragments : Array(Text::Formatted::FragmentHash),
         *,

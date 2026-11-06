@@ -55,10 +55,10 @@ module PDF
 
       private def parse_viewbox : Tuple(Float64, Float64, Float64, Float64)?
         vb = @root["viewBox"]?
-        return nil unless vb
+        return unless vb
 
         parts = vb.strip.split(/[\s,]+/)
-        return nil unless parts.size == 4
+        return unless parts.size == 4
 
         {parts[0].to_f, parts[1].to_f, parts[2].to_f, parts[3].to_f}
       rescue
@@ -68,9 +68,9 @@ module PDF
       # Parses a CSS length value (e.g., "100px", "50%", "10em", "5cm").
       # Returns the value in user units (approximately points for PDF).
       def self.parse_length(value : String?, reference : Float64 = 0.0) : Float64?
-        return nil unless value
+        return unless value
         value = value.strip
-        return nil if value.empty?
+        return if value.empty?
 
         if value.ends_with?("px")
           value.rchop("px").to_f?

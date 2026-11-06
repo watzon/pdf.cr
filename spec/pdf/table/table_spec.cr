@@ -320,6 +320,23 @@ describe PDF::Table do
       end
     end
 
+    it "accepts rows that mix strings and named tuples" do
+      doc = PDF::Document.new
+      doc.page do |page|
+        # Rows with different element types infer a union of array types.
+        table = page.table(
+          [
+            ["a", "b", "c"],
+            [{content: "spans all", colspan: 3, align: "center"}],
+          ],
+          at: {50, 700},
+        )
+        table.row_count.should eq(2)
+        table.cells[1][0].colspan.should eq(3)
+        table.cells[1][0].align.should eq(:center)
+      end
+    end
+
     it "accepts a plain string-array table" do
       doc = PDF::Document.new
       doc.page do |page|
