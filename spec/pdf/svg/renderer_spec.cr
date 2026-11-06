@@ -13,8 +13,7 @@ describe PDF::SVG::Parser do
       svg = %(<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"></svg>)
       parser = PDF::SVG::Parser.new(svg)
       vb = parser.viewbox
-      vb.should_not be_nil
-      vb = vb.not_nil!
+      vb = vb.should_not be_nil
       vb[0].should eq(0.0)
       vb[1].should eq(0.0)
       vb[2].should eq(400.0)
@@ -59,14 +58,12 @@ describe PDF::SVG::Parser do
 
     it "parses cm values" do
       result = PDF::SVG::Parser.parse_length("1cm")
-      result.should_not be_nil
-      result.not_nil!.should be_close(28.3465, 0.01)
+      result.should_not(be_nil).should be_close(28.3465, 0.01)
     end
 
     it "parses mm values" do
       result = PDF::SVG::Parser.parse_length("10mm")
-      result.should_not be_nil
-      result.not_nil!.should be_close(28.3465, 0.01)
+      result.should_not(be_nil).should be_close(28.3465, 0.01)
     end
 
     it "parses bare numbers" do
@@ -89,9 +86,11 @@ describe PDF::SVG::Renderer do
       doc = PDF::Document.new
       doc.page do |page|
         page.font("Helvetica", size: 10)
-        svg = %(<svg width="200" height="100" xmlns="http://www.w3.org/2000/svg">
-          <rect x="10" y="10" width="80" height="40" fill="blue" stroke="black" stroke-width="2"/>
-        </svg>)
+        svg = <<-SVG
+          <svg width="200" height="100" xmlns="http://www.w3.org/2000/svg">
+            <rect x="10" y="10" width="80" height="40" fill="blue" stroke="black" stroke-width="2"/>
+          </svg>
+          SVG
         renderer = page.svg(svg, at: {50, 700})
         renderer.output_width.should eq(200.0)
         renderer.output_height.should eq(100.0)
@@ -106,9 +105,11 @@ describe PDF::SVG::Renderer do
       doc = PDF::Document.new
       doc.page do |page|
         page.font("Helvetica", size: 10)
-        svg = %(<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="50" cy="50" r="40" fill="red"/>
-        </svg>)
+        svg = <<-SVG
+          <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="50" cy="50" r="40" fill="red"/>
+          </svg>
+          SVG
         page.svg(svg, at: {50, 700})
       end
 
@@ -121,9 +122,11 @@ describe PDF::SVG::Renderer do
       doc = PDF::Document.new
       doc.page do |page|
         page.font("Helvetica", size: 10)
-        svg = %(<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-          <line x1="0" y1="0" x2="200" y2="200" stroke="green" stroke-width="3"/>
-        </svg>)
+        svg = <<-SVG
+          <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+            <line x1="0" y1="0" x2="200" y2="200" stroke="green" stroke-width="3"/>
+          </svg>
+          SVG
         page.svg(svg, at: {50, 700})
       end
 
@@ -136,9 +139,11 @@ describe PDF::SVG::Renderer do
       doc = PDF::Document.new
       doc.page do |page|
         page.font("Helvetica", size: 10)
-        svg = %(<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-          <polygon points="100,10 40,198 190,78 10,78 160,198" fill="gold" stroke="black"/>
-        </svg>)
+        svg = <<-SVG
+          <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="100,10 40,198 190,78 10,78 160,198" fill="gold" stroke="black"/>
+          </svg>
+          SVG
         page.svg(svg, at: {50, 700})
       end
 
@@ -151,9 +156,11 @@ describe PDF::SVG::Renderer do
       doc = PDF::Document.new
       doc.page do |page|
         page.font("Helvetica", size: 10)
-        svg = %(<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-          <path d="M 10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80" fill="none" stroke="purple" stroke-width="2"/>
-        </svg>)
+        svg = <<-SVG
+          <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 10 80 C 40 10, 65 10, 95 80 S 150 150, 180 80" fill="none" stroke="purple" stroke-width="2"/>
+          </svg>
+          SVG
         page.svg(svg, at: {50, 700})
       end
 
@@ -166,11 +173,13 @@ describe PDF::SVG::Renderer do
       doc = PDF::Document.new
       doc.page do |page|
         page.font("Helvetica", size: 10)
-        svg = %(<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-          <g transform="translate(50, 50)">
-            <rect x="0" y="0" width="50" height="50" fill="orange"/>
-          </g>
-        </svg>)
+        svg = <<-SVG
+          <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+            <g transform="translate(50, 50)">
+              <rect x="0" y="0" width="50" height="50" fill="orange"/>
+            </g>
+          </svg>
+          SVG
         page.svg(svg, at: {50, 700})
       end
 
@@ -183,9 +192,11 @@ describe PDF::SVG::Renderer do
       doc = PDF::Document.new
       doc.page do |page|
         page.font("Helvetica", size: 10)
-        svg = %(<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-          <rect transform="translate(20, 30)" x="0" y="0" width="10" height="10" fill="orange"/>
-        </svg>)
+        svg = <<-SVG
+          <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+            <rect transform="translate(20, 30)" x="0" y="0" width="10" height="10" fill="orange"/>
+          </svg>
+          SVG
         page.svg(svg, at: {50, 700})
         # Root cm maps SVG space to the page; the element cm is the plain SVG matrix.
         page.content_string.should contain("1 0 0 1 20 30 cm")
@@ -197,9 +208,11 @@ describe PDF::SVG::Renderer do
       doc = PDF::Document.new
       doc.page do |page|
         page.font("Helvetica", size: 10)
-        svg = %(<svg width="200" height="100" xmlns="http://www.w3.org/2000/svg">
-          <text x="10" y="50" fill="black" font-size="16">Hello SVG</text>
-        </svg>)
+        svg = <<-SVG
+          <svg width="200" height="100" xmlns="http://www.w3.org/2000/svg">
+            <text x="10" y="50" fill="black" font-size="16">Hello SVG</text>
+          </svg>
+          SVG
         page.svg(svg, at: {50, 700})
       end
 
@@ -212,9 +225,11 @@ describe PDF::SVG::Renderer do
       doc = PDF::Document.new
       doc.page do |page|
         page.font("Helvetica", size: 10)
-        svg = %(<svg width="200" height="100" xmlns="http://www.w3.org/2000/svg">
-          <rect x="0" y="0" width="200" height="100" fill="lightblue"/>
-        </svg>)
+        svg = <<-SVG
+          <svg width="200" height="100" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="0" width="200" height="100" fill="lightblue"/>
+          </svg>
+          SVG
         renderer = page.svg(svg, at: {50, 700}, width: 400.0, height: 200.0)
         renderer.output_width.should eq(400.0)
         renderer.output_height.should eq(200.0)
@@ -229,9 +244,11 @@ describe PDF::SVG::Renderer do
       doc = PDF::Document.new
       doc.page do |page|
         page.font("Helvetica", size: 10)
-        svg = %(<svg width="200" height="100" xmlns="http://www.w3.org/2000/svg">
-          <rect x="10" y="10" width="80" height="40" style="fill:red;stroke:blue;stroke-width:3"/>
-        </svg>)
+        svg = <<-SVG
+          <svg width="200" height="100" xmlns="http://www.w3.org/2000/svg">
+            <rect x="10" y="10" width="80" height="40" style="fill:red;stroke:blue;stroke-width:3"/>
+          </svg>
+          SVG
         page.svg(svg, at: {50, 700})
       end
 
@@ -244,9 +261,11 @@ describe PDF::SVG::Renderer do
       doc = PDF::Document.new
       doc.page do |page|
         page.font("Helvetica", size: 10)
-        svg = %(<svg width="200" height="100" xmlns="http://www.w3.org/2000/svg">
-          <ellipse cx="100" cy="50" rx="80" ry="40" fill="green"/>
-        </svg>)
+        svg = <<-SVG
+          <svg width="200" height="100" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="100" cy="50" rx="80" ry="40" fill="green"/>
+          </svg>
+          SVG
         page.svg(svg, at: {50, 700})
       end
 
@@ -259,9 +278,11 @@ describe PDF::SVG::Renderer do
       doc = PDF::Document.new
       doc.page do |page|
         page.font("Helvetica", size: 10)
-        svg = %(<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
-          <polyline points="0,40 40,40 40,80 80,80 80,120 120,120" fill="none" stroke="black" stroke-width="2"/>
-        </svg>)
+        svg = <<-SVG
+          <svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+            <polyline points="0,40 40,40 40,80 80,80 80,120 120,120" fill="none" stroke="black" stroke-width="2"/>
+          </svg>
+          SVG
         page.svg(svg, at: {50, 700})
       end
 
@@ -337,7 +358,7 @@ describe "SVG coordinate mapping" do
       renderer = page.svg(%(<svg width="100" height="50" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="50"/></svg>), at: {0, 100}, width: 200.0)
       c = page.content_string
     end
-    renderer.not_nil!.output_height.should eq(100.0)
+    renderer.should_not(be_nil).output_height.should eq(100.0)
     expect_pt(svg_point_on_page(c, 100.0, 50.0), 200.0, 0.0)
     expect_pt(svg_point_on_page(c, 0.0, 0.0), 0.0, 100.0)
   end

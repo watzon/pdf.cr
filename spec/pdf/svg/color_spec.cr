@@ -4,8 +4,7 @@ describe PDF::SVG::Color do
   describe ".parse" do
     it "parses hex colors (#RRGGBB)" do
       result = PDF::SVG::Color.parse("#FF0000")
-      result.should_not be_nil
-      result = result.not_nil!
+      result = result.should_not be_nil
       result[0].should be_close(1.0, 0.01)
       result[1].should be_close(0.0, 0.01)
       result[2].should be_close(0.0, 0.01)
@@ -13,8 +12,7 @@ describe PDF::SVG::Color do
 
     it "parses short hex colors (#RGB)" do
       result = PDF::SVG::Color.parse("#F00")
-      result.should_not be_nil
-      result = result.not_nil!
+      result = result.should_not be_nil
       result[0].should be_close(1.0, 0.01)
       result[1].should be_close(0.0, 0.01)
       result[2].should be_close(0.0, 0.01)
@@ -22,8 +20,7 @@ describe PDF::SVG::Color do
 
     it "parses named colors" do
       result = PDF::SVG::Color.parse("blue")
-      result.should_not be_nil
-      result = result.not_nil!
+      result = result.should_not be_nil
       result[0].should be_close(0.0, 0.01)
       result[1].should be_close(0.0, 0.01)
       result[2].should be_close(1.0, 0.01)
@@ -31,8 +28,7 @@ describe PDF::SVG::Color do
 
     it "parses rgb() functional notation" do
       result = PDF::SVG::Color.parse("rgb(0, 128, 255)")
-      result.should_not be_nil
-      result = result.not_nil!
+      result = result.should_not be_nil
       result[0].should be_close(0.0, 0.01)
       result[1].should be_close(0.502, 0.01)
       result[2].should be_close(1.0, 0.01)

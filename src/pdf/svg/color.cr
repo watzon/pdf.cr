@@ -184,8 +184,6 @@ module PDF
           g = hex[2..3].to_i(16)
           b = hex[4..5].to_i(16)
           {r / 255.0, g / 255.0, b / 255.0}
-        else
-          nil
         end
       rescue
         nil
