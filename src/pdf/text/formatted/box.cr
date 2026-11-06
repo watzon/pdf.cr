@@ -54,6 +54,9 @@ module PDF
         # Leading (extra space between lines)
         getter leading : Float64
 
+        # Vertical metrics mode, see `FontMeasurer` (`:fixed` or `:font`)
+        getter metrics : Symbol
+
         # The line height of the last rendered line
         getter line_height : Float64 = 0.0
 
@@ -69,14 +72,18 @@ module PDF
         # Whether everything was printed
         getter? everything_printed : Bool = false
 
-        # The actual height consumed by rendered text
+        # The actual height consumed by rendered text: from the top of the
+        # box to the descender of the last rendered line. Zero when nothing
+        # was printed.
         getter rendered_height : Float64 = 0.0
+
+        # The number of lines rendered by the last `#render`.
+        getter line_count : Int32 = 0
 
         @formatted_text : Array(FragmentHash)
         @document : Document
         @font_name : String
         @font_size : Float64
-        @baseline_y : Float64 = 0.0
 
         def initialize(
           *,
@@ -90,11 +97,23 @@ module PDF
           @document : Document,
           @font_name : String = "Helvetica",
           @font_size : Float64 = 12.0,
+          @metrics : Symbol = :fixed,
         )
           unless OVERFLOW_MODES.includes?(@overflow)
             raise ArgumentError.new("Invalid overflow mode: #{@overflow.inspect}. Expected one of #{OVERFLOW_MODES.map(&.inspect).join(", ")}")
           end
+          unless FontMeasurer::METRICS_MODES.includes?(@metrics)
+            raise ArgumentError.new("Invalid metrics mode: #{@metrics.inspect}. Expected one of #{FontMeasurer::METRICS_MODES.map(&.inspect).join(", ")}")
+          end
           @formatted_text = formatted_text
+        end
+
+        # The y coordinate below the last rendered line (the top of the box
+        # minus `#rendered_height`). Place the next element here to continue
+        # the layout below the text. Equal to the top of the box when nothing
+        # was printed.
+        def cursor : Float64
+          @at[1] - @rendered_height
         end
 
         # Renders the formatted text into the given page.
@@ -102,80 +121,23 @@ module PDF
         # Returns an array of fragment hashes representing any text that
         # did not fit within the box dimensions.
         def render(page : Page) : Array(FragmentHash)
-          with_overflow_strategy { render_pass(page) }
-        end
-
-        private def render_pass(page : Page) : Array(FragmentHash)
-          font_measurer = FontMeasurer.new(@document, @font_name, @font_size)
-          arranger = Arranger.new
-          line_wrap = LineWrap.new
-
-          arranger.format_array = @formatted_text
-
-          @baseline_y = 0.0
-          @nothing_printed = true
-          @everything_printed = false
-          printed_lines = [] of String
-
-          loop do
-            # Wrap the next line
-            line_text = line_wrap.wrap_line(
-              arranger: arranger,
-              width: @width,
-              font_measurer: font_measurer,
-            )
-
-            # No progress possible (nothing consumed, no newline): stop
-            if arranger.consumed.empty? && !line_wrap.newline_encountered? && !arranger.finished?
-              arranger.repack_unretrieved
-              break
-            end
-
-            # Check if there's enough height for this line
-            @line_height = arranger.max_line_height
-            @descender = arranger.max_descender
-            @ascender = arranger.max_ascender
-
-            diff = if @baseline_y == 0.0
-                     @ascender + @descender
-                   else
-                     @descender + @line_height + @leading
-                   end
-
-            required_height = @baseline_y.abs + diff
-
-            if required_height > height_limit + 0.0001
-              # No room for this line
-              arranger.repack_unretrieved
-              break
-            end
-
-            # Move baseline down
-            if @baseline_y == 0.0
-              @baseline_y = -@ascender
-            else
-              @baseline_y -= (@line_height + @leading)
-            end
-
-            # Draw the fragments for this line
-            draw_line(page, arranger, line_wrap, font_measurer)
-
-            @nothing_printed = false
-            printed_lines << line_text
-
-            break if arranger.finished?
-          end
-
-          @everything_printed = arranger.finished?
-          @rendered_height = @baseline_y.abs + @descender
-
-          arranger.unconsumed
+          result = with_overflow_strategy { layout_pass(page) }
+          @line_height = result.line_height
+          @ascender = result.ascender
+          @descender = result.descender
+          @line_count = result.line_count
+          @nothing_printed = result.line_count == 0
+          @everything_printed = result.remaining.empty?
+          @rendered_height = result.height
+          result.remaining
         end
 
         # Performs a dry run to calculate dimensions without drawing.
-        # Returns the remaining text that would not fit.
+        # Returns the height that the text would use and the remaining text
+        # that would not fit.
         def dry_run : Tuple(Float64, Array(FragmentHash))
-          with_overflow_strategy { measure_pass }
+          result = with_overflow_strategy { layout_pass(nil) }
+          {result.height, result.remaining}
         end
 
         # The height limit in effect for the current overflow mode.
@@ -195,7 +157,7 @@ module PDF
             loop do
               @font_size = size
               @formatted_text = scale_fragments(original_text, size / original_size)
-              break if measure_pass[1].empty?
+              break if layout_pass(nil).remaining.empty?
               break if size - SHRINK_STEP < MIN_SHRINK_SIZE
               size -= SHRINK_STEP
             end
@@ -216,61 +178,68 @@ module PDF
           end
         end
 
-        private def measure_pass : Tuple(Float64, Array(FragmentHash))
-          font_measurer = FontMeasurer.new(@document, @font_name, @font_size)
+        # The outcome of one layout pass.
+        private record PassResult,
+          remaining : Array(FragmentHash),
+          height : Float64,
+          line_count : Int32,
+          line_height : Float64,
+          ascender : Float64,
+          descender : Float64
+
+        # Wraps the text into lines that fit the box. With a page, each line
+        # that fits is drawn; without one, the pass only measures. The
+        # metrics of a line that does not fit are not kept, so the height
+        # ends at the descender of the last line that fits.
+        private def layout_pass(page : Page?) : PassResult
+          font_measurer = FontMeasurer.new(@document, @font_name, @font_size, @metrics)
           arranger = Arranger.new
           line_wrap = LineWrap.new
-
           arranger.format_array = @formatted_text
 
           baseline_y = 0.0
-          line_height = 0.0
-          descender_val = 0.0
-          ascender_val = 0.0
+          line_count = 0
+          line_height = ascender = descender = 0.0
 
           loop do
-            line_wrap.wrap_line(
-              arranger: arranger,
-              width: @width,
-              font_measurer: font_measurer,
-            )
+            line_wrap.wrap_line(arranger: arranger, width: @width, font_measurer: font_measurer)
 
+            # No progress possible (nothing consumed, no newline): stop
             if arranger.consumed.empty? && !line_wrap.newline_encountered? && !arranger.finished?
               arranger.repack_unretrieved
               break
             end
 
-            line_height = arranger.max_line_height
-            descender_val = arranger.max_descender
-            ascender_val = arranger.max_ascender
+            next_line_height = arranger.max_line_height
+            next_baseline = if line_count == 0
+                              -arranger.max_ascender
+                            else
+                              baseline_y - (next_line_height + @leading)
+                            end
 
-            diff = if baseline_y == 0.0
-                     ascender_val + descender_val
-                   else
-                     descender_val + line_height + @leading
-                   end
-
-            required_height = baseline_y.abs + diff
-
-            if required_height > height_limit + 0.0001
+            if next_baseline.abs + arranger.max_descender > height_limit + 0.0001
+              # No room for this line
               arranger.repack_unretrieved
               break
             end
 
-            if baseline_y == 0.0
-              baseline_y = -ascender_val
-            else
-              baseline_y -= (line_height + @leading)
-            end
+            baseline_y = next_baseline
+            line_height = next_line_height
+            ascender = arranger.max_ascender
+            descender = arranger.max_descender
+            line_count += 1
+
+            draw_line(page, arranger, line_wrap, font_measurer, baseline_y) if page
 
             break if arranger.finished?
           end
 
-          height_used = baseline_y.abs + descender_val
-          {height_used, arranger.unconsumed}
+          height = line_count == 0 ? 0.0 : baseline_y.abs + descender
+          PassResult.new(arranger.unconsumed, height, line_count, line_height, ascender, descender)
         end
 
-        private def draw_line(page : Page, arranger : Arranger, line_wrap : LineWrap, font_measurer : FontMeasurer) : Nil
+        private def draw_line(page : Page, arranger : Arranger, line_wrap : LineWrap,
+                              font_measurer : FontMeasurer, baseline_y : Float64) : Nil
           fragments = arranger.fragments.dup
           return if fragments.empty?
 
@@ -303,10 +272,10 @@ module PDF
 
             # Calculate x position
             x = @at[0] + x_offset + accumulated_x
-            y = @at[1] + @baseline_y + fragment.y_offset
+            y = @at[1] + baseline_y + fragment.y_offset
 
             fragment.left = x
-            fragment.baseline = @at[1] + @baseline_y
+            fragment.baseline = @at[1] + baseline_y
 
             # Draw the fragment
             draw_fragment(page, fragment, x, y, font_measurer)
@@ -332,12 +301,8 @@ module PDF
           return if fragment.text.empty? || fragment.text == "\n"
 
           # Resolve the font for this fragment
-          font_name = resolve_font_name(fragment.format_state)
-          font_size = fragment.size || @font_size
-
-          if fragment.subscript? || fragment.superscript?
-            font_size *= 0.583
-          end
+          font = font_measurer.font(fragment.format_state)
+          font_size = font_measurer.effective_size(fragment.format_state)
 
           # Save graphics state for color changes
           rgb = fragment.color.try { |color| parse_hex_color(color) }
@@ -348,11 +313,11 @@ module PDF
           end
 
           # Set font and draw text
-          page.font(font_name, size: font_size)
+          page.font(font, size: font_size)
 
           if fragment.word_spacing != 0.0
             # For justified text, draw word by word with extra spacing
-            draw_justified_fragment(page, fragment, x, y, font_size)
+            draw_justified_fragment(page, fragment, x, y, font, font_size)
           else
             page.text(fragment.text, at: {x, y})
           end
@@ -377,10 +342,10 @@ module PDF
           page.restore_graphics_state
         end
 
-        private def draw_justified_fragment(page : Page, fragment : Fragment, x : Float64, y : Float64, font_size : Float64) : Nil
+        private def draw_justified_fragment(page : Page, fragment : Fragment, x : Float64, y : Float64,
+                                            font : Fonts::Base, font_size : Float64) : Nil
           words = fragment.text.split(' ')
           current_x = x
-          font = @document.font(resolve_font_name(fragment.format_state))
 
           words.each_with_index do |word, i|
             page.text(word, at: {current_x, y})
@@ -410,10 +375,6 @@ module PDF
             b = digits[4..5].to_i(16) / 255.0
           end
           {r, g, b}
-        end
-
-        private def resolve_font_name(format_state : FormatState) : String
-          FontMeasurer.resolve_font_name(format_state.font || @font_name, format_state.styles)
         end
       end
     end

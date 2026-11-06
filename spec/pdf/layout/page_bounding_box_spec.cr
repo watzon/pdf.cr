@@ -213,11 +213,11 @@ describe PDF::Page do
       end
     end
 
-    it "does not overprint column 0 when the last column is full" do
+    it "does not overprint column 0 when the last column is full and page_break is off" do
       doc = PDF::Document.new
       doc.page do |page|
         page.font("Helvetica", size: 12)
-        page.column_box(at: {50, 500}, width: 400, height: 50, columns: 2) do |col|
+        page.column_box(at: {50, 500}, width: 400, height: 50, columns: 2, page_break: false) do |col|
           rest = col.formatted_text(layout_long_frag)
           rest.should_not be_empty
           col.box.full?.should be_true

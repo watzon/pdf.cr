@@ -30,7 +30,9 @@ module PDF
       # Fixed height of the bounding box (nil for stretchy boxes)
       getter fixed_height : Float64?
 
-      # Parent bounding box (for nesting)
+      # Parent bounding box. A nested box is positioned in absolute page
+      # coordinates, and a stretchy nested box cannot grow past the floor of
+      # its parent (see `absolute_floor`).
       getter parent : BoundingBox?
 
       # Left padding accumulator
@@ -137,12 +139,23 @@ module PDF
 
       # Height available below the cursor for new content. For fixed boxes
       # this is the `cursor`. Stretchy boxes grow as content is added, so
-      # the space is bounded by the page bottom (y = 0) instead.
+      # the space is bounded by `absolute_floor` instead.
       def available_height : Float64
         if stretchy?
-          Math.max(absolute_cursor_y, 0.0)
+          Math.max(absolute_cursor_y - absolute_floor, 0.0)
         else
           cursor
+        end
+      end
+
+      # The lowest absolute y-coordinate that content in this box can use.
+      # A fixed box stops at its own bottom. A stretchy box stops at the
+      # floor of its parent, or at the page bottom (y = 0) without a parent.
+      def absolute_floor : Float64
+        if stretchy?
+          @parent.try(&.absolute_floor) || 0.0
+        else
+          absolute_bottom
         end
       end
 

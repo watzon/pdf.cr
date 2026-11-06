@@ -25,8 +25,8 @@ module PDF
       def initialize(svg_data : String)
         doc = XML.parse(svg_data)
         @root = find_svg_root(doc)
-        @width, @height = parse_dimensions
         @viewbox = parse_viewbox
+        @width, @height = parse_dimensions
       end
 
       # Returns all child elements of the SVG root.
@@ -47,10 +47,19 @@ module PDF
         raise ArgumentError.new("No <svg> root element found in SVG data")
       end
 
+      # Percentages have no reference here, so they (and missing or
+      # non-positive sizes) fall back to the viewBox size, then to the
+      # SVG default of 300 x 150.
       private def parse_dimensions : Tuple(Float64, Float64)
-        w = parse_length(@root["width"]?) || 300.0
-        h = parse_length(@root["height"]?) || 150.0
-        {w, h}
+        vb = @viewbox
+        {dimension("width", vb.try(&.[2]) || 300.0), dimension("height", vb.try(&.[3]) || 150.0)}
+      end
+
+      private def dimension(name : String, fallback : Float64) : Float64
+        value = @root[name]?
+        return fallback if value.nil? || value.strip.ends_with?('%')
+        length = parse_length(value)
+        length && length > 0 ? length : fallback
       end
 
       private def parse_viewbox : Tuple(Float64, Float64, Float64, Float64)?
@@ -60,7 +69,9 @@ module PDF
         parts = vb.strip.split(/[\s,]+/)
         return unless parts.size == 4
 
-        {parts[0].to_f, parts[1].to_f, parts[2].to_f, parts[3].to_f}
+        numbers = parts.map(&.to_f)
+        return unless numbers.all?(&.finite?)
+        {numbers[0], numbers[1], numbers[2], numbers[3]}
       rescue
         nil
       end
@@ -85,9 +96,9 @@ module PDF
         value = value.strip
         return if value.empty?
 
-        unit, factor = LENGTH_UNITS.find { |suffix, _| value.ends_with?(suffix) } || return value.to_f?
+        unit, factor = LENGTH_UNITS.find { |suffix, _| value.ends_with?(suffix) } || return value.to_f?.try { |number| number if number.finite? }
         number = value.rchop(unit).to_f?
-        number ? factor.call(number, reference) : nil
+        number && number.finite? ? factor.call(number, reference) : nil
       end
 
       private def parse_length(value : String?, reference : Float64 = 0.0) : Float64?

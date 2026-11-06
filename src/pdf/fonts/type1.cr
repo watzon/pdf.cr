@@ -69,6 +69,45 @@ module PDF
         widths[code]? || DEFAULT_WIDTH
       end
 
+      def ascender : Int32
+        vertical_metrics[0]
+      end
+
+      def descender : Int32
+        vertical_metrics[1]
+      end
+
+      def line_gap : Int32
+        vertical_metrics[2]
+      end
+
+      private def vertical_metrics : Tuple(Int32, Int32, Int32)
+        VERTICAL_METRICS[@name]
+      end
+
+      # Vertical metrics `{ascender, descender, line_gap}` for the standard
+      # 14 fonts, in 1/1000 of the em-square. Ascender and descender are the
+      # `Ascender` and `Descender` values of the Adobe Core 14 AFM files. The
+      # line gap is the `FontBBox` height minus `ascender - descender`, as in
+      # Prawn. Symbol and ZapfDingbats have no `Ascender` entry, so their
+      # values come from the `FontBBox`.
+      VERTICAL_METRICS = {
+        "Helvetica"             => {718, -207, 231},
+        "Helvetica-Bold"        => {718, -207, 265},
+        "Helvetica-Oblique"     => {718, -207, 231},
+        "Helvetica-BoldOblique" => {718, -207, 265},
+        "Times-Roman"           => {683, -217, 216},
+        "Times-Bold"            => {683, -217, 253},
+        "Times-Italic"          => {683, -217, 200},
+        "Times-BoldItalic"      => {683, -217, 239},
+        "Courier"               => {629, -157, 269},
+        "Courier-Bold"          => {629, -157, 265},
+        "Courier-Oblique"       => {629, -157, 269},
+        "Courier-BoldOblique"   => {629, -157, 265},
+        "Symbol"                => {1010, -293, 0},
+        "ZapfDingbats"          => {820, -143, 0},
+      }
+
       # Default width for missing glyphs
       DEFAULT_WIDTH = 600
 

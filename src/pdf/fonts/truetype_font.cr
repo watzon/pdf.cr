@@ -84,6 +84,22 @@ module PDF
         (width.to_f64 * 1000 / @parser.units_per_em).round.to_i32
       end
 
+      def ascender : Int32
+        to_thousandths(@parser.ascender)
+      end
+
+      def descender : Int32
+        to_thousandths(@parser.descender)
+      end
+
+      def line_gap : Int32
+        to_thousandths(@parser.line_gap)
+      end
+
+      private def to_thousandths(font_units : Int) : Int32
+        (font_units.to_f64 * 1000 / @parser.units_per_em).round.to_i32
+      end
+
       # Get the subset font data
       def subset_data : Bytes
         @subset_data ||= @subsetter.subset

@@ -49,6 +49,7 @@ require "./pdf/fonts/base"
 require "./pdf/fonts/type1"
 require "./pdf/fonts/truetype"
 require "./pdf/fonts/truetype_font"
+require "./pdf/fonts/font_family"
 
 # Image handling
 require "./pdf/images/base"
@@ -73,6 +74,8 @@ require "./pdf/svg"
 
 # Document structure
 require "./pdf/document"
+require "./pdf/document_font_families"
+require "./pdf/document_formatted_text"
 require "./pdf/page"
 require "./pdf/page_formatted_text"
 require "./pdf/page_bounding_box"

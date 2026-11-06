@@ -42,6 +42,10 @@ module PDF
     # Font resources used on this page (name -> reference)
     @font_resources : Hash(String, Objects::Reference)
 
+    # Resource keys of the Type1 fonts (name -> key such as "F1"). Keys are
+    # assigned once, from the same sequence as the TrueType font keys.
+    @font_resource_keys = {} of String => String
+
     # TrueType font resources (font object -> resource data)
     @truetype_font_resources : Hash(Fonts::TrueTypeFont, TrueTypeFontResources)
 
@@ -50,6 +54,12 @@ module PDF
 
     # Extended graphics state resources (ExtGState object -> resource data)
     @ext_g_state_resources : Hash(UInt64, ExtGStateResources)
+
+    # Shading resources (resource key -> shading object reference)
+    @shading_resources : Hash(String, Objects::Reference)
+
+    # Pattern resources (resource key -> pattern object reference)
+    @pattern_resources : Hash(String, Objects::Reference)
 
     # The page's indirect object (set after finalization)
     @page_object : Objects::Indirect?
@@ -95,6 +105,8 @@ module PDF
       @truetype_font_resources = {} of Fonts::TrueTypeFont => TrueTypeFontResources
       @image_resources = {} of Images::Base => ImageResources
       @ext_g_state_resources = {} of UInt64 => ExtGStateResources
+      @shading_resources = {} of String => Objects::Reference
+      @pattern_resources = {} of String => Objects::Reference
     end
 
     # Sets the current font for subsequent text operations.
@@ -112,6 +124,7 @@ module PDF
       font_obj = @document.font(name)
       unless @font_resources.has_key?(name)
         font_indirect = @document.register_object(font_obj.to_dictionary)
+        @font_resource_keys[name] = next_font_key
         @font_resources[name] = font_indirect.reference
       end
 
@@ -140,7 +153,7 @@ module PDF
 
     # Registers a TrueType font and creates all necessary PDF objects
     private def register_truetype_font(ttf_font : Fonts::TrueTypeFont) : Nil
-      key = "F#{@font_resources.size + @truetype_font_resources.size + 1}"
+      key = next_font_key
 
       # We defer actual object creation until finalization
       # For now, just record that this font is used with nil reference
@@ -874,6 +887,51 @@ module PDF
     end
 
     # ---------------------------------------------------------------------------
+    # Shadings and Patterns
+    # ---------------------------------------------------------------------------
+
+    # Registers a shading dictionary (for example an axial or radial shading)
+    # as a page resource and returns its resource key. Paint it with
+    # `#shade`, or wrap it in a pattern with `#register_pattern`.
+    #
+    # ```
+    # key = page.register_shading(shading_dict)
+    # page.shade(key)
+    # ```
+    def register_shading(shading : Objects::Base) : String
+      key = "Sh#{@shading_resources.size + 1}"
+      @shading_resources[key] = @document.register_object(shading).reference
+      key
+    end
+
+    # Paints a registered shading over the current clipping region
+    # (the `sh` operator). The shading uses the current transformation.
+    def shade(key : String) : self
+      @content << "/#{key} sh\n"
+      self
+    end
+
+    # Registers a pattern dictionary as a page resource and returns its
+    # resource key. Use it with `#fill_pattern` or `#stroke_pattern`.
+    def register_pattern(pattern : Objects::Base) : String
+      key = "P#{@pattern_resources.size + 1}"
+      @pattern_resources[key] = @document.register_object(pattern).reference
+      key
+    end
+
+    # Sets a registered pattern as the fill paint.
+    def fill_pattern(key : String) : self
+      @content << "/Pattern cs /#{key} scn\n"
+      self
+    end
+
+    # Sets a registered pattern as the stroke paint.
+    def stroke_pattern(key : String) : self
+      @content << "/Pattern CS /#{key} SCN\n"
+      self
+    end
+
+    # ---------------------------------------------------------------------------
     # Shape Helpers
     # ---------------------------------------------------------------------------
 
@@ -1275,6 +1333,9 @@ module PDF
         resources["ExtGState"] = ext_g_state_dict unless ext_g_state_dict.empty?
       end
 
+      add_named_resources(resources, "Shading", @shading_resources)
+      add_named_resources(resources, "Pattern", @pattern_resources)
+
       # ProcSet (required for some viewers)
       procset = Objects::Array.new
       procset << Objects::Name.new("PDF")
@@ -1285,10 +1346,22 @@ module PDF
       resources
     end
 
+    private def add_named_resources(resources : Objects::Dictionary, category : String, entries : Hash(String, Objects::Reference)) : Nil
+      return if entries.empty?
+
+      dict = Objects::Dictionary.new
+      entries.each { |key, ref| dict[key] = ref }
+      resources[category] = dict
+    end
+
     private def font_resource_key(font_name : String) : String
-      # Create a simple key like F1, F2, etc.
-      index = @font_resources.keys.index(font_name) || @font_resources.size
-      "F#{index + 1}"
+      @font_resource_keys[font_name]
+    end
+
+    # The key for the next font resource (F1, F2, ...). Type1 and TrueType
+    # fonts share the sequence, so a key is never used twice on a page.
+    private def next_font_key : String
+      "F#{@font_resources.size + @truetype_font_resources.size + 1}"
     end
 
     private def encode_text_string(text : String, font_name : String) : String
