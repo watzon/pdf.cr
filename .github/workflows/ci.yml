@@ -32,7 +32,9 @@ jobs:
 
       - name: Build Ameba
         # Ameba 1.7 no longer builds bin/ameba during `shards install`.
-        run: crystal build -o bin/ameba lib/ameba/bin/ameba.cr
+        run: |
+          mkdir -p bin
+          crystal build -o bin/ameba lib/ameba/bin/ameba.cr
         if: matrix.crystal == 'latest'
 
       - name: Run Ameba linter
