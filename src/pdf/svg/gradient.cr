@@ -198,10 +198,19 @@ module PDF
           values << values.last
         end
 
-        pieces = (0...offsets.size - 1).map { |i| interpolation(values[i], values[i + 1]) }
+        # Zero-width intervals (hard color stops) become the jump between
+        # their neighbours, so Bounds stay strictly increasing.
+        pieces = [] of Objects::Dictionary
+        ends = [] of Float64
+        (0...offsets.size - 1).each do |i|
+          next unless offsets[i + 1] > offsets[i]
+          pieces << interpolation(values[i], values[i + 1])
+          ends << offsets[i + 1]
+        end
+        return interpolation(values.last, values.last) if pieces.empty?
         return pieces.first if pieces.size == 1
 
-        stitching(pieces, offsets[1...-1])
+        stitching(pieces, ends[0...-1])
       end
 
       private def interpolation(from : Array(Float64), to : Array(Float64)) : Objects::Dictionary

@@ -32,7 +32,7 @@ module PDF
         property x = 0.0
         property y = 0.0
         @chunk = 0
-        @pending_space : Tuple(Style, Int32)? = nil
+        @pending_space : Tuple(Style, Array(PositionFrame))? = nil
         @started = false
         @buffer = String::Builder.new
         @run_x = 0.0
@@ -44,19 +44,19 @@ module PDF
 
         # Normalizes one character. Returns nil when the character is
         # white space. The first space of a run of white space is kept,
-        # with its style and position-frame depth, and emitted before the
-        # next visible character; leading and trailing white space is
-        # dropped.
-        def visible_char(char : Char, style : Style, depth : Int32) : Char?
+        # with its style and the position frames active where it appeared,
+        # and emitted before the next visible character; leading and
+        # trailing white space is dropped.
+        def visible_char(char : Char, style : Style, frames : Array(PositionFrame)) : Char?
           if char.whitespace?
-            @pending_space ||= {style, depth} if @started
+            @pending_space ||= {style, frames.dup} if @started
             return
           end
           char
         end
 
-        # Returns the style and frame depth of the kept space, if any.
-        def take_pending_space : Tuple(Style, Int32)?
+        # Returns the style and frames of the kept space, if any.
+        def take_pending_space : Tuple(Style, Array(PositionFrame))?
           pending = @pending_space
           @pending_space = nil
           pending
@@ -109,7 +109,7 @@ module PDF
 
       # Walks text nodes and tspan elements in document order.
       private def collect_text(node : XML::Node, style : Style, layout : TextLayout, frames : Array(PositionFrame)) : Nil
-        frames << position_frame(node)
+        frames << position_frame(node, style.font_size)
         node.children.each do |child|
           if child.text? || child.cdata?
             child.content.each_char { |char| layout_char(char, style, layout, frames) }
@@ -124,27 +124,29 @@ module PDF
         frames.pop
       end
 
-      private def position_frame(node : XML::Node) : PositionFrame
+      private def position_frame(node : XML::Node, size : Float64) : PositionFrame
         PositionFrame.new(
-          length_list(node["x"]?, :x),
-          length_list(node["y"]?, :y),
-          length_list(node["dx"]?, :x),
-          length_list(node["dy"]?, :y),
+          length_list(node["x"]?, :x, size),
+          length_list(node["y"]?, :y, size),
+          length_list(node["dx"]?, :x, size),
+          length_list(node["dy"]?, :y, size),
         )
       end
 
-      private def length_list(value : String?, axis : Symbol) : Array(Float64)
+      private def length_list(value : String?, axis : Symbol, font_size : Float64) : Array(Float64)
         return [] of Float64 unless value
-        value.split(/[\s,]+/).reject(&.empty?).map { |part| length(part, axis) }
+        value.split(/[\s,]+/).reject(&.empty?).map { |part| length(part, axis, font_size) }
       end
 
       private def layout_char(char : Char, style : Style, layout : TextLayout, frames : Array(PositionFrame)) : Nil
-        visible = layout.visible_char(char, style, frames.size)
+        visible = layout.visible_char(char, style, frames)
         return unless visible
 
-        if pending = layout.take_pending_space
-          space_style, depth = pending
-          layout_positioned(' ', space_style, layout, frames[0, depth])
+        pending = layout.take_pending_space
+        # A space before an absolutely positioned character would end the
+        # previous chunk and shift its anchor; drop it.
+        if pending && !(frame_value(frames, &.x) || frame_value(frames, &.y))
+          layout_positioned(' ', pending[0], layout, pending[1])
         end
         layout_positioned(visible, style, layout, frames)
       end
@@ -159,9 +161,6 @@ module PDF
         frames.each { |frame| frame.index += 1 }
 
         if abs_x || abs_y
-          # A space right before an absolutely positioned character is
-          # not part of either chunk.
-          return if char == ' '
           layout.new_chunk
           abs_x.try { |value| layout.x = value }
           abs_y.try { |value| layout.y = value }

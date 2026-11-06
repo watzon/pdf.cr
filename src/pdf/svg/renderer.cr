@@ -183,12 +183,19 @@ module PDF
         elsif tag == "svg"
           render_nested_svg(node, style)
         elsif tag == "switch"
-          first = node.children.find { |child| child.element? && !NON_RENDERING.includes?(child.name) }
+          first = node.children.find { |child| switch_candidate?(child) }
           render_element(first, style) if first
         else
           # g, a and unknown containers: draw children
           node.children.each { |child| render_element(child, style) }
         end
+      end
+
+      # A switch draws its first child that this renderer can draw.
+      private def switch_candidate?(node : XML::Node) : Bool
+        return false unless node.element?
+        return false if NON_RENDERING.includes?(node.name) || UNSUPPORTED.includes?(node.name)
+        node["requiredExtensions"]?.nil?
       end
 
       # -- Structure ---------------------------------------------------------
@@ -403,21 +410,38 @@ module PDF
           matrix = {box[2] - box[0], 0.0, 0.0, box[3] - box[1], box[0], box[1]}
         end
 
-        commands = outline(clip, matrix)
-        return clip_everything if commands.empty?
+        children = clip_children(clip, matrix)
+        return clip_everything if children.empty?
 
-        Geometry.emit(page, commands)
-        clip_rule_evenodd?(clip) ? page.clip_even_odd! : page.clip!
+        if children.size == 1
+          Geometry.emit(page, children.first[0])
+          children.first[1] ? page.clip_even_odd! : page.clip!
+        else
+          # The clip region is the union of the children: wind them all
+          # the same way and use the nonzero rule.
+          children.each { |child| Geometry.emit(page, Geometry.orient_positive(child[0])) }
+          page.clip!
+        end
+      end
+
+      # Returns the outline of each clipPath child, with whether its
+      # clip-rule is evenodd.
+      private def clip_children(clip : XML::Node, matrix : Transform::Matrix) : Array(Tuple(Array(PathCommand), Bool))
+        clip_style = Style.new.derive(declared(clip))
+        m = Transform.multiply(matrix, Transform.parse(clip["transform"]?))
+        result = [] of Tuple(Array(PathCommand), Bool)
+        clip.children.each do |child|
+          commands = outline(child, m)
+          next if commands.empty?
+          rule = clip_style.derive(declared(child))["clip-rule"]
+          result << {commands, rule == "evenodd"}
+        end
+        result
       end
 
       private def clip_everything : Nil
         page.rectangle(0, 0, 0, 0)
         page.clip!
-      end
-
-      private def clip_rule_evenodd?(clip : XML::Node) : Bool
-        return true if declared(clip)["clip-rule"]? == "evenodd"
-        clip.children.any? { |child| child.element? && declared(child)["clip-rule"]? == "evenodd" }
       end
 
       # -- Graphics state ----------------------------------------------------
@@ -450,7 +474,16 @@ module PDF
 
       # Resolves a length attribute; percentages refer to the current
       # viewport width (:x), height (:y) or normalized diagonal (:other).
-      private def length(value : String?, axis : Symbol) : Float64
+      # `em` and `ex` use `font_size` when given.
+      private def length(value : String?, axis : Symbol, font_size : Float64? = nil) : Float64
+        if font_size && value
+          stripped = value.strip
+          if stripped.ends_with?("em") || stripped.ends_with?("ex")
+            number = stripped[0...-2].to_f?
+            factor = stripped.ends_with?("em") ? font_size : font_size / 2.0
+            return number && number.finite? ? number * factor : 0.0
+          end
+        end
         Parser.parse_length(value, viewport_reference(axis)) || 0.0
       end
 

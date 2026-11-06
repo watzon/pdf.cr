@@ -91,6 +91,69 @@ module PDF
         end
       end
 
+      # Returns the outline wound so that its total signed area is
+      # positive. Under the nonzero rule, outlines with the same
+      # orientation then add up to their union where they overlap. The
+      # relative orientation of the subpaths (holes) is kept.
+      def self.orient_positive(commands : Array(PathCommand)) : Array(PathCommand)
+        commands = expand_rects(commands)
+        signed_area(commands) < 0 ? reverse(commands) : commands
+      end
+
+      # Shoelace area over the end and control points of every subpath.
+      def self.signed_area(commands : Array(PathCommand)) : Float64
+        area = 0.0
+        subpaths(commands).each do |path|
+          points = path.flat_map(&.args).each_slice(2).map { |pair| {pair[0], pair[1]} }.to_a
+          points.each_with_index do |point, i|
+            following = points[(i + 1) % points.size]
+            area += point[0] * following[1] - following[0] * point[1]
+          end
+        end
+        area / 2.0
+      end
+
+      # Reverses the direction of every subpath.
+      def self.reverse(commands : Array(PathCommand)) : Array(PathCommand)
+        subpaths(expand_rects(commands)).flat_map { |path| reverse_subpath(path) }
+      end
+
+      # Splits an outline at each move command.
+      private def self.subpaths(commands : Array(PathCommand)) : Array(Array(PathCommand))
+        result = [] of Array(PathCommand)
+        commands.each do |cmd|
+          result << [] of PathCommand if cmd.type == 'M' || result.empty?
+          result.last << cmd
+        end
+        result
+      end
+
+      private def self.reverse_subpath(path : Array(PathCommand)) : Array(PathCommand)
+        closed = path.last.type == 'Z'
+        segments = path.reject { |cmd| cmd.type == 'Z' }
+        return path if segments.empty? || segments.first.type != 'M'
+
+        starts = [] of Point
+        current = {segments.first.args[0], segments.first.args[1]}
+        segments[1..].each do |cmd|
+          starts << current
+          current = {cmd.args[-2], cmd.args[-1]}
+        end
+
+        result = [PathCommand.new('M', [current[0], current[1]])]
+        segments[1..].reverse.each_with_index do |cmd, i|
+          start = starts[starts.size - 1 - i]
+          if cmd.type == 'C'
+            a = cmd.args
+            result << PathCommand.new('C', [a[2], a[3], a[0], a[1], start[0], start[1]])
+          else
+            result << PathCommand.new('L', [start[0], start[1]])
+          end
+        end
+        result << PathCommand.new('Z') if closed
+        result
+      end
+
       # Returns the exact bounding box of the outline (curve extrema
       # included), or nil when the outline has no points.
       def self.bbox(commands : Array(PathCommand)) : Box?

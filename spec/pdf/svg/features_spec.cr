@@ -531,3 +531,68 @@ describe "PDF::Page shadings and patterns" do
     end
   end
 end
+
+describe "SVG edge cases found in review" do
+  it "clips to the union of overlapping clipPath children" do
+    c = content_of(svg_doc(%(<defs><clipPath id="c"><rect width="20" height="20"/><circle cx="12" cy="10" r="8"/></clipPath></defs>) +
+                           %(<rect width="40" height="20" clip-path="url(#c)"/>)))
+    # The rect already has a positive signed area; the circle is reversed
+    # to match, so the overlap has winding 2 instead of 0.
+    c.should contain("0 0 m\n20 0 l\n20 20 l\n0 20 l\nh\n4 10 m\n")
+    c.should match(/4 10 m\n\S+ \S+ \S+ \S+ 12 2 c\n/)
+    c.should_not contain("W*")
+  end
+
+  it "reverses subpaths without changing their shape" do
+    cmds = PDF::SVG::PathParser.parse("M0 0 L10 0 C10 5 5 10 0 10 Z")
+    reversed = PDF::SVG::Geometry.reverse(cmds)
+    reversed.map(&.type).should eq(['M', 'C', 'L', 'Z'])
+    reversed[1].args.should eq([5.0, 10.0, 10.0, 5.0, 10.0, 0.0])
+    PDF::SVG::Geometry.signed_area(reversed).should eq(-PDF::SVG::Geometry.signed_area(cmds))
+  end
+
+  it "keeps the x of a tspan that follows white space in a previous tspan" do
+    c = content_of(svg_doc(%(<text y="20"><tspan>a </tspan><tspan x="50">b</tspan></text>)))
+    text_origins(c).last.should eq({50.0, 20.0})
+    shown_text(c).should eq(%w[a b])
+  end
+
+  it "does not widen an anchored chunk with the space before the next chunk" do
+    c = content_of(svg_doc(%(<text y="20" text-anchor="end"><tspan x="50">i</tspan>\n<tspan x="80">i</tspan></text>)))
+    text_origins(c).map(&.[0].round(3)).should eq([(50 - 2.664).round(3), (80 - 2.664).round(3)])
+  end
+
+  it "resolves em in text positions against the font size" do
+    c = content_of(svg_doc(%(<text x="5" y="20" font-size="10"><tspan x="5">a</tspan><tspan x="5" dy="1.2em">b</tspan></text>)))
+    text_origins(c).last[1].should be_close(32.0, 1e-9)
+  end
+
+  it "draws the first supported child of a switch" do
+    c = content_of(svg_doc(%(<switch><foreignObject width="10" height="10"/><rect width="3" height="3"/></switch>)))
+    c.should contain("0 0 3 3 re")
+  end
+
+  it "falls back to the viewBox or default size for percentage dimensions" do
+    PDF::SVG::Parser.new(%(<svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"/>)).width.should eq(300.0)
+    parser = PDF::SVG::Parser.new(%(<svg width="100%" viewBox="0 0 40 20" xmlns="http://www.w3.org/2000/svg"/>))
+    {parser.width, parser.height}.should eq({40.0, 20.0})
+    content_of(%(<svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>)).should contain("0 0 1 1 re")
+  end
+
+  it "skips shapes with non-finite numbers" do
+    c = content_of(svg_doc(%(<circle cx="1" cy="1" r="nan"/><rect width="1e999" height="5"/>)))
+    c.downcase.should_not contain("nan")
+    c.downcase.should_not contain("inf")
+  end
+
+  it "drops zero-width intervals from hard color stops" do
+    _, pdf = render_full(svg_doc(%(<defs><linearGradient id="g"><stop offset="0" stop-color="red"/><stop offset="0.5" stop-color="red"/>) +
+                                 %(<stop offset="0.5" stop-color="blue"/><stop offset="1" stop-color="blue"/></linearGradient></defs><rect width="5" height="5" fill="url(#g)"/>)))
+    pdf.should contain("/Bounds [0.5]")
+  end
+
+  it "resolves currentColor in stops" do
+    _, pdf = render_full(svg_doc(%(<defs><linearGradient id="g" color="blue"><stop stop-color="currentColor"/><stop offset="1" stop-color="red"/></linearGradient></defs><rect width="5" height="5" fill="url(#g)"/>)))
+    pdf.should contain("/C0 [0 0 1]")
+  end
+end

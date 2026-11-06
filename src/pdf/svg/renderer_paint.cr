@@ -225,7 +225,9 @@ module PDF
         lookup = ->(id : String) { @ids[id]? }
         stop_style = ->(stop : XML::Node) do
           values = declared(stop)
-          {values["stop-color"]?, values["stop-opacity"]?}
+          color = values["stop-color"]?
+          color = values["color"]? || declared(node)["color"]? || "black" if color == "currentColor"
+          {color, values["stop-opacity"]?}
         end
         Gradient.from_node(node, lookup, stop_style)
       end
@@ -254,7 +256,7 @@ module PDF
 
       private def apply_stroke_properties(style : Style) : Nil
         if value = style["stroke-width"]
-          page.line_width(length(value, :other))
+          page.line_width(length(value, :other, style.font_size))
         end
         style["stroke-linecap"].try { |name| LINE_CAPS[name]?.try { |cap| page.line_cap(cap) } }
         style["stroke-linejoin"].try { |name| LINE_JOINS[name]?.try { |join| page.line_join(join) } }
@@ -280,7 +282,7 @@ module PDF
 
       private def stroke_width(style : Style) : Float64
         value = style["stroke-width"]
-        value ? length(value, :other) : 1.0
+        value ? length(value, :other, style.font_size) : 1.0
       end
 
       private def miter_limit(style : Style) : Float64
